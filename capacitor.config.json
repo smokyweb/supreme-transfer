@@ -1,0 +1,16 @@
+{
+  "appId": "com.bluesapps.supremetransfer",
+  "appName": "Supreme Transfer",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "allowNavigation": [
+      "supremetransfer.bluesapps.com",
+      "*.stripe.com",
+      "js.stripe.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

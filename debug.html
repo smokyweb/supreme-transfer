@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supreme Transfer Debug & Test</title>
+    <style>
+        body {
+            font-family: system-ui;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        h2 { color: #333; }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Supreme Transfer Debug & Test Panel</h1>
+    
+    <div class="test-section">
+        <h2>1️⃣ Login First</h2>
+        <input type="email" id="email" placeholder="kevin@knoxwebhq.com" value="kevin@knoxwebhq.com">
+        <input type="password" id="password" placeholder="any password">
+        <button onclick="login()">Login</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2️⃣ Check Current Setup</h2>
+        <button onclick="checkStats()">Check Admin Stats</button>
+        <button onclick="checkBalance()">Check Balance</button>
+        <button onclick="checkConfig()">Check Config</button>
+        <div id="setup-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3️⃣ Update Stripe Account</h2>
+        <input type="text" id="stripe-account" placeholder="acct_1SLTRVELxXuWkRMX" value="acct_1SLTRVELxXuWkRMX" style="width: 300px;">
+        <button onclick="updateStripeAccount()">Update Stripe Account</button>
+        <div id="stripe-update-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4️⃣ Sync Stripe Balance</h2>
+        <button onclick="syncStripe()">Sync Balance from Stripe</button>
+        <div id="sync-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5️⃣ Test Add Funds</h2>
+        <input type="number" id="amount" placeholder="25" value="25" style="width: 100px;">
+        <button onclick="testAddFunds()">Test Add Funds ($)</button>
+        <div id="funds-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>6️⃣ Direct Balance Update (Testing)</h2>
+        <button onclick="addTestFunds()">Add $50 Test Funds Directly</button>
+        <div id="test-funds-result" class="result"></div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+
+        function showResult(elementId, data, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = 'result ' + type;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        async function login() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value || 'test';
+                
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.token) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    showResult('login-result', `✅ Logged in as ${data.user.email}\nToken saved\nStripe Account: ${data.user.stripeAccountId || 'None'}`, 'success');
+                } else {
+                    showResult('login-result', data, 'error');
+                }
+            } catch (error) {
+                showResult('login-result', error.message, 'error');
+            }
+        }
+
+        async function checkStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                const data = await response.json();
+                showResult('setup-result', data, 'info');
+            } catch (error) {
+                showResult('setup-result', error.message, 'error');
+            }
+        }
+
+        async function checkBalance() {
+            if (!token) {
+                showResult('setup-result', 'Please login first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/wallet/balance', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await response.json();
+                showResult('setup-result', data, 'info');
+            } catch (error) {
+                showResult('setup-result', error.message, 'error');
+            }
+        }
+
+        async function checkConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                showResult('setup-result', data, 'info');
+            } catch (error) {
+                showResult('setup-result', error.message, 'error');
+            }
+        }
+
+        async function updateStripeAccount() {
+            if (!token) {
+                showResult('stripe-update-result', 'Please login first', 'error');
+                return;
+            }
+            
+            const accountId = document.getElementById('stripe-account').value;
+            
+            try {
+                const response = await fetch('/api/stripe/update-account', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ stripe_account_id: accountId })
+                });
+                
+                const data = await response.json();
+                showResult('stripe-update-result', data, data.success ? 'success' : 'error');
+            } catch (error) {
+                showResult('stripe-update-result', error.message, 'error');
+            }
+        }
+
+        async function syncStripe() {
+            if (!token) {
+                showResult('sync-result', 'Please login first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/stripe/sync', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                
+                const data = await response.json();
+                showResult('sync-result', data, data.success ? 'success' : 'error');
+            } catch (error) {
+                showResult('sync-result', error.message, 'error');
+            }
+        }
+
+        async function testAddFunds() {
+            if (!token) {
+                showResult('funds-result', 'Please login first', 'error');
+                return;
+            }
+            
+            const amount = parseFloat(document.getElementById('amount').value) * 100; // Convert to cents
+            
+            try {
+                // Step 1: Create payment intent
+                const intentResponse = await fetch('/api/payments/create-intent', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount })
+                });
+                
+                const intent = await intentResponse.json();
+                showResult('funds-result', `Step 1: Payment intent created\n${JSON.stringify(intent, null, 2)}`, 'info');
+                
+                // Step 2: Confirm payment (simulate)
+                const confirmResponse = await fetch('/api/payments/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        amount,
+                        payment_intent_id: intent.clientSecret 
+                    })
+                });
+                
+                const result = await confirmResponse.json();
+                
+                if (result.success) {
+                    showResult('funds-result', `✅ Added $${(amount/100).toFixed(2)} to your account!\n\nNow check your balance.`, 'success');
+                } else {
+                    showResult('funds-result', result, 'error');
+                }
+                
+            } catch (error) {
+                showResult('funds-result', error.message, 'error');
+            }
+        }
+
+        async function addTestFunds() {
+            if (!token) {
+                showResult('test-funds-result', 'Please login first', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/add-test-funds', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount: 5000 }) // $50
+                });
+                
+                const data = await response.json();
+                showResult('test-funds-result', data, data.success ? 'success' : 'error');
+            } catch (error) {
+                showResult('test-funds-result', error.message, 'error');
+            }
+        }
+
+        // Auto-check if already logged in
+        if (token) {
+            showResult('login-result', 'Already have token. Click Login to refresh or continue with tests.', 'info');
+        }
+    </script>
+</body>
+</html>

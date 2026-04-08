@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stripe Payment Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        * { box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .status-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .amount-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .amount-btn {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .amount-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .amount-btn.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+        
+        .custom-amount {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .custom-amount:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        #card-element {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: white;
+        }
+        
+        #card-element.StripeElement--focus {
+            border-color: #667eea;
+        }
+        
+        .test-cards {
+            background: #f0f8ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-cards h3 {
+            margin: 0 0 10px 0;
+            color: #0066cc;
+            font-size: 14px;
+        }
+        
+        .card-option {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            margin: 5px 0;
+            cursor: pointer;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .card-option:hover {
+            border-color: #0066cc;
+        }
+        
+        button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .balance-display {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .balance-amount {
+            font-size: 36px;
+            font-weight: 700;
+        }
+        
+        .balance-label {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💳 Stripe Payment Test</h1>
+        <p class="subtitle">Test real Stripe payments integration</p>
+        
+        <div class="balance-display">
+            <div class="balance-label">Current Balance</div>
+            <div class="balance-amount" id="balance">$0.00</div>
+        </div>
+        
+        <div class="status-box">
+            <div class="status-row">
+                <span>Stripe Status:</span>
+                <span id="stripe-status" class="badge warning">Checking...</span>
+            </div>
+            <div class="status-row">
+                <span>Mode:</span>
+                <span id="stripe-mode" class="badge">-</span>
+            </div>
+            <div class="status-row">
+                <span>User:</span>
+                <span id="user-email" class="badge">Not logged in</span>
+            </div>
+        </div>
+        
+        <h3>Select Amount</h3>
+        <div class="amount-grid">
+            <button class="amount-btn" onclick="selectAmount(10)">$10</button>
+            <button class="amount-btn" onclick="selectAmount(25)">$25</button>
+            <button class="amount-btn" onclick="selectAmount(50)">$50</button>
+        </div>
+        
+        <input type="number" 
+               id="custom-amount" 
+               class="custom-amount" 
+               placeholder="Custom amount ($)"
+               min="1"
+               step="0.01">
+        
+        <div class="test-cards">
+            <h3>🧪 Test Card Numbers (Click to copy)</h3>
+            <div class="card-option" onclick="copyCard('4242424242424242')">
+                <span>✅ Success</span>
+                <code>4242 4242 4242 4242</code>
+            </div>
+            <div class="card-option" onclick="copyCard('4000000000000002')">
+                <span>❌ Decline</span>
+                <code>4000 0000 0000 0002</code>
+            </div>
+            <div class="card-option" onclick="copyCard('4000002500003155')">
+                <span>🔒 3D Secure</span>
+                <code>4000 0025 0000 3155</code>
+            </div>
+            <small style="color: #666;">Use any future expiry (12/34) and any CVC (123)</small>
+        </div>
+        
+        <div id="card-element">
+            <!-- Stripe card element will go here -->
+        </div>
+        
+        <button id="submit-btn" onclick="handlePayment()">
+            <span id="button-text">Add Funds</span>
+        </button>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+        let selectedAmount = 0;
+        const token = localStorage.getItem('token');
+        
+        // Initialize
+        async function init() {
+            // Check login
+            if (!token) {
+                showResult('error', 'Please login first');
+                document.getElementById('user-email').textContent = 'Not logged in';
+                return;
+            }
+            
+            // Get user info
+            try {
+                const userResponse = await fetch('/api/auth/me', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const userData = await userResponse.json();
+                document.getElementById('user-email').textContent = userData.user?.email || 'Unknown';
+            } catch (e) {
+                console.error('User fetch error:', e);
+            }
+            
+            // Get balance
+            fetchBalance();
+            
+            // Check Stripe config
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                if (config.stripePublishableKey) {
+                    stripe = Stripe(config.stripePublishableKey);
+                    elements = stripe.elements();
+                    
+                    // Create card element
+                    cardElement = elements.create('card', {
+                        style: {
+                            base: {
+                                fontSize: '16px',
+                                color: '#32325d',
+                                '::placeholder': {
+                                    color: '#aab7c4'
+                                }
+                            }
+                        }
+                    });
+                    
+                    cardElement.mount('#card-element');
+                    
+                    document.getElementById('stripe-status').textContent = 'Connected';
+                    document.getElementById('stripe-status').className = 'badge success';
+                    document.getElementById('stripe-mode').textContent = 
+                        config.stripePublishableKey.includes('pk_test') ? 'Test Mode' : 'Live Mode';
+                    document.getElementById('stripe-mode').className = 
+                        config.stripePublishableKey.includes('pk_test') ? 'badge warning' : 'badge success';
+                } else {
+                    document.getElementById('stripe-status').textContent = 'Not configured';
+                    document.getElementById('stripe-status').className = 'badge error';
+                    document.getElementById('card-element').innerHTML = 
+                        '<p style="color: #666; text-align: center;">Stripe not configured - Add STRIPE_SECRET_KEY</p>';
+                }
+            } catch (error) {
+                console.error('Config error:', error);
+                document.getElementById('stripe-status').textContent = 'Error';
+                document.getElementById('stripe-status').className = 'badge error';
+            }
+        }
+        
+        async function fetchBalance() {
+            try {
+                const response = await fetch('/api/wallet/balance', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await response.json();
+                document.getElementById('balance').textContent = data.formatted || '$0.00';
+            } catch (e) {
+                console.error('Balance error:', e);
+            }
+        }
+        
+        function selectAmount(amount) {
+            selectedAmount = amount;
+            document.getElementById('custom-amount').value = amount;
+            
+            // Update button styles
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.textContent === `$${amount}`) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+        
+        function copyCard(number) {
+            navigator.clipboard.writeText(number);
+            showResult('success', 'Card number copied to clipboard!', 2000);
+        }
+        
+        async function handlePayment() {
+            const amount = parseFloat(document.getElementById('custom-amount').value);
+            
+            if (!amount || amount < 1) {
+                showResult('error', 'Please enter an amount of at least $1');
+                return;
+            }
+            
+            if (!stripe || !cardElement) {
+                // Fallback for when Stripe isn't configured
+                await handleMockPayment(amount);
+                return;
+            }
+            
+            setLoading(true);
+            
+            try {
+                // Create payment intent
+                const intentResponse = await fetch('/api/payments/create-intent', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount: Math.round(amount * 100) })
+                });
+                
+                const intentData = await intentResponse.json();
+                
+                if (intentData.mock) {
+                    // Server returned mock - complete without Stripe
+                    await handleMockPayment(amount);
+                    return;
+                }
+                
+                // Confirm payment with Stripe
+                const { error, paymentIntent } = await stripe.confirmCardPayment(
+                    intentData.clientSecret,
+                    {
+                        payment_method: {
+                            card: cardElement
+                        }
+                    }
+                );
+                
+                if (error) {
+                    showResult('error', error.message);
+                    setLoading(false);
+                    return;
+                }
+                
+                // Confirm on backend
+                const confirmResponse = await fetch('/api/payments/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: Math.round(amount * 100),
+                        payment_intent_id: paymentIntent.id
+                    })
+                });
+                
+                const confirmData = await confirmResponse.json();
+                
+                if (confirmData.success) {
+                    showResult('success', `✅ Payment successful! Added $${amount.toFixed(2)} to your account`);
+                    fetchBalance();
+                    document.getElementById('custom-amount').value = '';
+                    cardElement.clear();
+                } else {
+                    showResult('error', confirmData.error || 'Payment failed');
+                }
+                
+            } catch (error) {
+                console.error('Payment error:', error);
+                showResult('error', error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        async function handleMockPayment(amount) {
+            setLoading(true);
+            
+            try {
+                // Create mock payment
+                const intentResponse = await fetch('/api/payments/create-intent', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount: Math.round(amount * 100) })
+                });
+                
+                const intentData = await intentResponse.json();
+                
+                // Confirm mock payment
+                const confirmResponse = await fetch('/api/payments/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: Math.round(amount * 100),
+                        payment_intent_id: intentData.clientSecret
+                    })
+                });
+                
+                const confirmData = await confirmResponse.json();
+                
+                if (confirmData.success) {
+                    showResult('success', `✅ (Test Mode) Added $${amount.toFixed(2)} to your account`);
+                    fetchBalance();
+                    document.getElementById('custom-amount').value = '';
+                } else {
+                    showResult('error', confirmData.error || 'Payment failed');
+                }
+            } catch (error) {
+                showResult('error', error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        function setLoading(loading) {
+            const btn = document.getElementById('submit-btn');
+            const btnText = document.getElementById('button-text');
+            
+            btn.disabled = loading;
+            if (loading) {
+                btnText.innerHTML = '<span class="spinner"></span> Processing...';
+            } else {
+                btnText.textContent = 'Add Funds';
+            }
+        }
+        
+        function showResult(type, message, duration = 0) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultDiv.style.display = 'block';
+            
+            if (duration > 0) {
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                }, duration);
+            }
+        }
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

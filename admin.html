@@ -1,0 +1,2665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supreme Transfer Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .admin-gradient {
+            background: linear-gradient(135deg, #0A0A1A 0%, #12122a 100%);
+        }
+        .sidebar-active {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid white;
+        }
+    </style>
+</head>
+<body>
+    <div id="admin-root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // API Base URL
+        const API_BASE = window.location.origin + '/admin/api';
+
+        // Admin App Component
+        function AdminApp() {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [adminUser, setAdminUser] = useState(null);
+            const [currentPage, setCurrentPage] = useState('dashboard');
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                checkAuth();
+            }, []);
+
+            const checkAuth = async () => {
+                const token = localStorage.getItem('admin_token');
+                if (token) {
+                    try {
+                        const response = await fetch(`${API_BASE}/auth/verify`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            setAdminUser(data.admin);
+                            setIsAuthenticated(true);
+                        } else {
+                            localStorage.removeItem('admin_token');
+                        }
+                    } catch (error) {
+                        console.error('Auth check failed:', error);
+                    }
+                }
+                setLoading(false);
+            };
+
+            const handleLogin = (admin, token) => {
+                localStorage.setItem('admin_token', token);
+                setAdminUser(admin);
+                setIsAuthenticated(true);
+            };
+
+            const handleLogout = () => {
+                localStorage.removeItem('admin_token');
+                setAdminUser(null);
+                setIsAuthenticated(false);
+                setCurrentPage('dashboard');
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+                        <div className="text-xl text-gray-600">Loading...</div>
+                    </div>
+                );
+            }
+
+            if (!isAuthenticated) {
+                return <LoginPage onLogin={handleLogin} />;
+            }
+
+            return (
+                <div className="flex h-screen bg-gray-100">
+                    <Sidebar 
+                        currentPage={currentPage} 
+                        setCurrentPage={setCurrentPage}
+                        adminUser={adminUser}
+                        onLogout={handleLogout}
+                    />
+                    <main className="flex-1 overflow-y-auto">
+                        {currentPage === 'dashboard' && <Dashboard />}
+                        {currentPage === 'users' && <UsersPage />}
+                        {currentPage === 'transactions' && <TransactionsPage />}
+                        {currentPage === 'advances' && <AdvancesPage />}
+                        {currentPage === 'reports' && <ReportsPage />}
+
+                        {currentPage === 'recent-activity' && <RecentActivityPage />}
+                        {currentPage === 'settings' && <SettingsPage />}
+                    </main>
+                </div>
+            );
+        }
+
+        // Login Page Component
+        function LoginPage({ onLogin }) {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        onLogin(data.admin, data.token);
+                    } else {
+                        setError(data.error || 'Login failed');
+                    }
+                } catch (error) {
+                    setError('Connection error. Please try again.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen admin-gradient flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900">Supreme Transfer</h1>
+                            <p className="text-gray-600 mt-2">Admin Portal</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Username
+                                </label>
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    // required
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                                {loading ? 'Logging in...' : 'Login'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 text-center text-sm text-gray-500">
+
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Sidebar Component
+        function Sidebar({ currentPage, setCurrentPage, adminUser, onLogout }) {
+            const menuItems = [
+                { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+                { id: 'users', label: 'Users', icon: 'users' },
+                { id: 'transactions', label: 'Transactions', icon: 'credit-card' },
+                { id: 'advances', label: 'Platform Advances', icon: 'trending-up' },
+                { id: 'reports', label: 'Reports', icon: 'bar-chart' },
+                { id: 'recent-activity', label: 'Recent Activity', icon: 'activity' },
+                { id: 'settings', label: 'Settings', icon: 'settings' },
+            ];
+
+            useEffect(() => {
+                lucide.createIcons();
+            });
+
+            return (
+                <aside className="w-64 admin-gradient text-white flex flex-col">
+                    <div className="p-6">
+                        <h1 className="text-2xl font-bold">Supreme Transfer</h1>
+                        <p className="text-sm text-blue-200 mt-1">Admin Portal</p>
+                    </div>
+
+                    <nav className="flex-1 px-4">
+                        {menuItems.map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => setCurrentPage(item.id)}
+                                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 transition ${
+                                    currentPage === item.id ? 'sidebar-active' : 'hover:bg-white/5'
+                                }`}
+                            >
+                                <i data-lucide={item.icon} className="w-5 h-5"></i>
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    <div className="p-4 border-t border-white/10">
+                        <div className="flex items-center space-x-3 mb-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                <i data-lucide="user" className="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <div className="font-medium">{adminUser?.full_name || adminUser?.username}</div>
+                                <div className="text-xs text-blue-200">{adminUser?.role}</div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onLogout}
+                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
+                        >
+                            <i data-lucide="log-out" className="w-4 h-4"></i>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </aside>
+            );
+        }
+
+        // Dashboard Component
+        // DashboardStats — shared stat boxes used by Dashboard
+        function DashboardStats() {
+            const [stats, setStats] = useState(null);
+            const [platformBalance, setPlatformBalance] = useState(null);
+            const [fromDate, setFromDate] = useState('');
+            const [toDate, setToDate] = useState('');
+            const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+            const [withdrawAmount, setWithdrawAmount] = useState('');
+            const [withdrawNote, setWithdrawNote] = useState('');
+            const [withdrawing, setWithdrawing] = useState(false);
+
+            const loadStats = (from, to) => {
+                const token = localStorage.getItem('admin_token');
+                const params = new URLSearchParams();
+                if (from) params.append('from', new Date(from).toISOString());
+                if (to) params.append('to', new Date(to + 'T23:59:59').toISOString());
+                const qs = params.toString() ? '?' + params.toString() : '';
+                fetch(`${API_BASE}/stats${qs}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(r => r.json()).then(setStats).catch(() => {});
+                fetch(`${API_BASE}/platform-balance`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(r => r.ok ? r.json() : null).then(d => d && setPlatformBalance(d)).catch(() => {});
+            };
+
+            useEffect(() => { loadStats(fromDate, toDate); }, []);
+
+            const handleFilter = () => loadStats(fromDate, toDate);
+            const handleClearFilter = () => { setFromDate(''); setToDate(''); loadStats('', ''); };
+
+            const handleWithdraw = async () => {
+                if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) return alert('Enter a valid amount');
+                setWithdrawing(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/withdraw`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ amount: withdrawAmount, note: withdrawNote })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert(data.message);
+                        setShowWithdrawModal(false);
+                        setWithdrawAmount(''); setWithdrawNote('');
+                        loadStats(fromDate, toDate);
+                    } else {
+                        alert(data.error || 'Withdrawal failed');
+                    }
+                } catch (e) { alert('Error: ' + e.message); }
+                finally { setWithdrawing(false); }
+            };
+
+            return (
+                <div>
+                    {/* Date range filter */}
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <label className="text-sm font-medium text-gray-600">Date Range:</label>
+                        <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                        <span className="text-gray-400">—</span>
+                        <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                        <button onClick={handleFilter} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Apply</button>
+                        {(fromDate || toDate) && (
+                            <button onClick={handleClearFilter} className="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Clear</button>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
+                        <StatCard title="Total Users" value={stats?.total_users || 0} icon="users" color="blue" />
+                        <StatCard title="Total Transactions" value={stats?.total_transactions || 0} icon="credit-card" color="green" />
+                        <StatCard title="Transaction Volume" value={`$${(stats?.transaction_volume || 0).toLocaleString()}`} icon="dollar-sign" color="purple" />
+                        <StatCard title="Platform Revenue" value={`$${(stats?.platform_revenue || 0).toLocaleString()}`} icon="trending-up" color="orange" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                        <StatCard title="Stripe Balance" value={platformBalance ? '$' + platformBalance.available_usd.toFixed(2) : '...'} icon="landmark" color="indigo" />
+                        <StatCard title="Total Wallet Balance" value={stats ? '$' + (stats.total_wallet_balance || 0).toFixed(2) : '...'} icon="wallet" color="teal" />
+                        <div className="bg-white rounded-lg shadow p-6 relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-emerald-500 p-3 rounded-lg">
+                                    <i data-lucide="banknote" className="w-6 h-6 text-white"></i>
+                                </div>
+                                <button onClick={() => setShowWithdrawModal(true)}
+                                    className="text-xs px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700">
+                                    Withdraw
+                                </button>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{stats ? '$' + (stats.admin_amount_available || 0).toFixed(2) : '...'}</div>
+                            <div className="text-sm text-gray-600">Admin Amount Available</div>
+                        </div>
+                        <StatCard title="User Funds Waiting" value={stats ? '$' + (stats.user_funds_waiting || 0).toFixed(2) : '...'} icon="clock" color="amber" />
+                    </div>
+
+                    {/* Withdraw Modal */}
+                    {showWithdrawModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Record Admin Withdrawal</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-700">Amount ($)</label>
+                                        <input type="number" step="0.01" min="0.01" value={withdrawAmount}
+                                            onChange={e => setWithdrawAmount(e.target.value)}
+                                            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="0.00" />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-700">Note (optional)</label>
+                                        <input type="text" value={withdrawNote}
+                                            onChange={e => setWithdrawNote(e.target.value)}
+                                            className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                                            placeholder="Reason for withdrawal" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 mt-4">
+                                    <button onClick={handleWithdraw} disabled={withdrawing}
+                                        className="flex-1 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                                        {withdrawing ? 'Processing...' : 'Confirm'}
+                                    </button>
+                                    <button onClick={() => setShowWithdrawModal(false)}
+                                        className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Dashboard = Transaction Monitoring + stat boxes
+        function Dashboard() {
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+                    <DashboardStats />
+                    <TransactionsPage embedded={true} />
+                </div>
+            );
+        }
+
+        // Standalone Recent Activity page
+        function RecentActivityPage() {
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-6">Recent Activity</h1>
+                    <RecentActivity />
+                </div>
+            );
+        }
+
+
+        // Stat Card Component
+        function StatCard({ title, value, icon, color }) {
+            const colorClasses = {
+                blue: 'bg-blue-500',
+                green: 'bg-green-500',
+                purple: 'bg-purple-500',
+                orange: 'bg-orange-500',
+                indigo: 'bg-indigo-500',
+                teal: 'bg-teal-500',
+                emerald: 'bg-emerald-500',
+                amber: 'bg-amber-500'
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className={`${colorClasses[color]} p-3 rounded-lg`}>
+                            <i data-lucide={icon} className="w-6 h-6 text-white"></i>
+                        </div>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{value}</div>
+                    <div className="text-sm text-gray-600">{title}</div>
+                </div>
+            );
+        }
+
+        // Recent Activity Component
+        function RecentActivity() {
+            const [activities, setActivities] = useState([]);
+
+            useEffect(() => {
+                loadActivities();
+            }, []);
+
+            const loadActivities = async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/activity/recent`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setActivities(data.activities || []);
+                } catch (error) {
+                    console.error('Failed to load activities:', error);
+                }
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                    <div className="space-y-3">
+                        {activities.length > 0 ? activities.map((activity, index) => (
+                            <div key={index} className="flex items-start space-x-3 pb-3 border-b border-gray-100 last:border-0">
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                                    <p className="text-xs text-gray-500">{new Date(activity.created_at).toLocaleString()}</p>
+                                </div>
+                            </div>
+                        )) : (
+                            <p className="text-sm text-gray-500">No recent activity</p>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Platform Fees Report Component
+        function PlatformFeesReport() {
+            const [fees, setFees] = React.useState([]);
+            const [summary, setSummary] = React.useState({ total: 0, count: 0 });
+            const [loading, setLoading] = React.useState(true);
+            const STRIPE_DASHBOARD = 'https://dashboard.stripe.com/balance/overview';
+
+            React.useEffect(() => {
+                loadFees();
+            }, []);
+
+            const loadFees = async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/platform-fees`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setFees(data.fees || []);
+                        setSummary(data.summary || { total: 0, count: 0 });
+                    }
+                } catch (e) {
+                    console.error('Failed to load platform fees:', e);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-lg font-semibold text-gray-900">Platform Fees Collected</h3>
+                        <a
+                            href={STRIPE_DASHBOARD}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 font-medium border border-purple-200 rounded-lg px-3 py-1.5 hover:bg-purple-50 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            View in Stripe
+                        </a>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div className="bg-green-50 rounded-lg p-4">
+                            <p className="text-sm text-green-700 font-medium">Total Fees Collected</p>
+                            <p className="text-2xl font-bold text-green-800">${summary.total.toFixed(2)}</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-4">
+                            <p className="text-sm text-blue-700 font-medium">Fee Transactions</p>
+                            <p className="text-2xl font-bold text-blue-800">{summary.count}</p>
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <p className="text-sm text-gray-400">Loading...</p>
+                    ) : fees.length === 0 ? (
+                        <p className="text-sm text-gray-500">No fee transactions found.</p>
+                    ) : (
+                        <div className="overflow-auto max-h-64">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs text-gray-500 border-b">
+                                        <th className="pb-2 font-medium">Description</th>
+                                        <th className="pb-2 font-medium">User</th>
+                                        <th className="pb-2 font-medium text-right">Fee</th>
+                                        <th className="pb-2 font-medium text-right">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {fees.map((f, i) => (
+                                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                                            <td className="py-2 text-gray-800 max-w-xs truncate">{f.description}</td>
+                                            <td className="py-2 text-gray-500 text-xs">{f.user_email}</td>
+                                            <td className="py-2 text-right font-medium text-green-700">+${Math.abs(f.amount).toFixed(2)}</td>
+                                            <td className="py-2 text-right text-gray-400 text-xs">{new Date(f.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Pending Advances Component
+        // Users Page (placeholder - will expand)
+        // Users Page - Full Implementation
+        function UsersPage() {
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [search, setSearch] = useState('');
+            const [selectedUser, setSelectedUser] = useState(null);
+            const [page, setPage] = useState(1);
+            const [total, setTotal] = useState(0);
+            const [stripeStatuses, setStripeStatuses] = useState({});
+            const [selectedIds, setSelectedIds] = useState([]);
+            const [bulkDeleting, setBulkDeleting] = useState(false);
+
+            useEffect(() => {
+                loadUsers();
+                lucide.createIcons();
+            }, [page, search]);
+
+            const loadUsers = async () => {
+                try {
+                    setLoading(true);
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(
+                        `${API_BASE}/users?page=${page}&limit=20&search=${search}`,
+                        { headers: { 'Authorization': `Bearer ${token}` } }
+                    );
+                    const data = await response.json();
+                    const loadedUsers = data.users || [];
+                    setUsers(loadedUsers);
+                    setTotal(data.total || 0);
+                    setSelectedIds([]);
+
+                    // Fetch Stripe status for each user in background
+                    const usersWithStripe = loadedUsers.filter(u => u.stripe_account_id);
+                    Promise.allSettled(usersWithStripe.map(async (u) => {
+                        try {
+                            const r = await fetch(`${API_BASE}/users/${u.id}/stripe-status`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (r.ok) {
+                                const s = await r.json();
+                                setStripeStatuses(prev => ({ ...prev, [u.id]: s }));
+                            }
+                        } catch (e) { /* silent */ }
+                    }));
+                } catch (error) {
+                    console.error('Failed to load users:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const viewUserDetails = async (userId) => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/users/${userId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setSelectedUser(data);
+                } catch (error) {
+                    console.error('Failed to load user details:', error);
+                }
+            };
+
+            const toggleSelect = (id) => {
+                setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+            };
+
+            const toggleSelectAll = () => {
+                if (selectedIds.length === users.length) {
+                    setSelectedIds([]);
+                } else {
+                    setSelectedIds(users.map(u => u.id));
+                }
+            };
+
+            const handleBulkDelete = async () => {
+                if (!confirm(`Delete ${selectedIds.length} user(s)? This cannot be undone.`)) return;
+                if (!confirm(`Final confirmation: delete ${selectedIds.length} user(s)?`)) return;
+                setBulkDeleting(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/bulk-delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ userIds: selectedIds, confirm: true })
+                    });
+                    const data = await res.json();
+                    let msg = `✅ Deleted: ${data.deleted}`;
+                    if (data.skipped?.length > 0) msg += `\n⚠️ Skipped ${data.skipped.length}:\n` + data.skipped.map(s => `${s.userId}: ${s.reason}`).join('\n');
+                    alert(msg);
+                    loadUsers();
+                } catch (e) {
+                    alert('Bulk delete error: ' + e.message);
+                } finally {
+                    setBulkDeleting(false);
+                }
+            };
+
+            if (selectedUser) {
+                return <UserDetailsView user={selectedUser} onBack={() => setSelectedUser(null)} />;
+            }
+
+            return (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+                        <div className="text-sm text-gray-500">Total: {total} users</div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow">
+                        <div className="p-6 border-b">
+                            <input
+                                type="text"
+                                placeholder="Search by email, name, or username..."
+                                value={search}
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        {selectedIds.length > 0 && (
+                            <div className="px-6 py-3 bg-red-50 border-b flex items-center justify-between">
+                                <span className="text-sm text-red-700">{selectedIds.length} user(s) selected</span>
+                                <button
+                                    onClick={handleBulkDelete}
+                                    disabled={bulkDeleting}
+                                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {bulkDeleting ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}
+                                </button>
+                            </div>
+                        )}
+
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-500">Loading users...</div>
+                        ) : users.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">No users found</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-4 py-3">
+                                                <input type="checkbox" checked={selectedIds.length === users.length && users.length > 0} onChange={toggleSelectAll} className="rounded" />
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stripe Account</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stripe Status</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {users.map(user => (
+                                            <tr key={user.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-4">
+                                                    <input type="checkbox" checked={selectedIds.includes(user.id)} onChange={() => toggleSelect(user.id)} className="rounded" />
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-gray-900">{user.name}</div>
+                                                    <div className="text-sm text-gray-500">{user.username || user.id}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                                                <td className="px-6 py-4">
+                                                    {user.stripe_account_id ? (
+                                                        <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Connected</span>
+                                                    ) : (
+                                                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">Not Connected</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {user.stripe_account_id ? (
+                                                        stripeStatuses[user.id] ? (
+                                                            stripeStatuses[user.id].status === 'enabled'
+                                                                ? <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-medium">Enabled</span>
+                                                                : <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded font-medium">Restricted</span>
+                                                        ) : <span className="text-xs text-gray-400">Loading...</span>
+                                                    ) : <span className="text-xs text-gray-400">—</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    {new Date(user.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <button
+                                                        onClick={() => viewUserDetails(user.id)}
+                                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {total > 20 && (
+                            <div className="p-4 border-t flex items-center justify-between">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                    className="px-4 py-2 border rounded-lg disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+                                <span className="text-sm text-gray-600">
+                                    Page {page} of {Math.ceil(total / 20)}
+                                </span>
+                                <button
+                                    onClick={() => setPage(p => p + 1)}
+                                    disabled={page >= Math.ceil(total / 20)}
+                                    className="px-4 py-2 border rounded-lg disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // User Details View Component
+        function UserDetailsView({ user, onBack }) {
+            const [stripeBalance, setStripeBalance] = useState(null);
+            const [loadingBalance, setLoadingBalance] = useState(false);
+            const [payoutAmount, setPayoutAmount] = useState('');
+            const [payoutType, setPayoutType] = useState('instant');
+            const [sending, setSending] = useState(false);
+            const [message, setMessage] = useState({ type: '', text: '' });
+            const [showConfirm, setShowConfirm] = useState(false);
+            const [editingAccountId, setEditingAccountId] = useState(false);
+            const [newAccountId, setNewAccountId] = useState('');
+            const [updatingAccountId, setUpdatingAccountId] = useState(false);
+            const [enablingInstantPayouts, setEnablingInstantPayouts] = useState(false);
+            const [payoutsData, setPayoutsData] = useState(null);
+            const [loadingPayouts, setLoadingPayouts] = useState(false);
+            const [stripeStatus, setStripeStatus] = useState(null);
+
+            useEffect(() => {
+                if (user.user.stripe_account_id) {
+                    loadPayouts();
+                    loadStripeStatus();
+                }
+            }, [user.user.stripe_account_id]);
+
+            const loadStripeStatus = async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/${user.user.id}/stripe-status`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setStripeStatus(data);
+                    }
+                } catch (e) { console.error('Stripe status load error', e); }
+            };
+
+            const loadPayouts = async () => {
+                setLoadingPayouts(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/${user.user.id}/payouts`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) setPayoutsData(data);
+                } catch(e) { console.error('Payouts load error', e); }
+                finally { setLoadingPayouts(false); }
+            };
+
+            const statusBadge = (status) => {
+                const map = {
+                    paid: 'bg-green-100 text-green-800',
+                    in_transit: 'bg-blue-100 text-blue-800',
+                    pending: 'bg-yellow-100 text-yellow-800',
+                    failed: 'bg-red-100 text-red-800',
+                    canceled: 'bg-gray-100 text-gray-800'
+                };
+                return map[status] || 'bg-gray-100 text-gray-800';
+            };
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, []);
+
+            const enableInstantPayouts = async () => {
+                if (!confirm(`Enable instant payouts for ${user.user.name}?\n\nThis will request the instant_payouts capability from Stripe. It may take a few minutes to activate.`)) {
+                    return;
+                }
+
+                setEnablingInstantPayouts(true);
+                setMessage({ type: '', text: '' });
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/users/${user.user.id}/enable-instant-payouts`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        setMessage({ 
+                            type: 'success', 
+                            text: `Instant payouts capability requested! Status: ${data.capability_status}. May take a few minutes to activate.` 
+                        });
+                    } else {
+                        // Show detailed error
+                        const errorText = data.error || data.message || 'Failed to enable instant payouts';
+                        const detailsText = data.details ? ` Details: ${data.details}` : '';
+                        setMessage({ 
+                            type: 'error', 
+                            text: `${errorText}${detailsText}` 
+                        });
+                        console.error('Enable instant payouts error:', data);
+                    }
+                } catch (error) {
+                    setMessage({ 
+                        type: 'error', 
+                        text: `Error: ${error.message}. Check console for details.` 
+                    });
+                    console.error('Enable instant payouts exception:', error);
+                } finally {
+                    setEnablingInstantPayouts(false);
+                }
+            };
+
+            const updateStripeAccountId = async () => {
+                if (!newAccountId || !newAccountId.startsWith('acct_')) {
+                    setMessage({ type: 'error', text: 'Invalid account ID. Must start with "acct_"' });
+                    return;
+                }
+
+                if (!confirm(`Update Stripe account ID for ${user.user.name}?\n\nOld: ${user.user.stripe_account_id}\nNew: ${newAccountId}\n\nThis cannot be undone!`)) {
+                    return;
+                }
+
+                setUpdatingAccountId(true);
+                setMessage({ type: '', text: '' });
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/users/${user.user.id}/stripe-account`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ stripe_account_id: newAccountId })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        setMessage({ 
+                            type: 'success', 
+                            text: `Stripe account ID updated successfully! Old: ${user.user.stripe_account_id}, New: ${newAccountId}` 
+                        });
+                        user.user.stripe_account_id = newAccountId; // Update in place
+                        setEditingAccountId(false);
+                        setNewAccountId('');
+                    } else {
+                        setMessage({ type: 'error', text: data.error || 'Failed to update account ID' });
+                    }
+                } catch (error) {
+                    setMessage({ type: 'error', text: 'Error updating account ID' });
+                } finally {
+                    setUpdatingAccountId(false);
+                }
+            };
+
+            const loadStripeBalance = async () => {
+                if (!user.user.stripe_account_id) {
+                    setMessage({ type: 'error', text: 'User has no Stripe account connected' });
+                    return;
+                }
+
+                setLoadingBalance(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/users/${user.user.id}/stripe-balance`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        setStripeBalance(data);
+                    } else {
+                        setMessage({ type: 'error', text: data.error || 'Failed to load balance' });
+                    }
+                } catch (error) {
+                    setMessage({ type: 'error', text: 'Error loading Stripe balance' });
+                } finally {
+                    setLoadingBalance(false);
+                }
+            };
+
+            const handleDeleteUser = async () => {
+                const email = user?.user?.email;
+                const name = user?.user?.name || email;
+
+                if (!confirm(`⚠️ DELETE USER ACCOUNT\n\nUser: ${name} (${email})\n\nThis will permanently delete:\n• User account\n• All transactions\n• Wallet\n• Contacts & payment requests\n\nThis cannot be undone. Continue?`)) return;
+                if (!confirm(`Final confirmation: permanently delete ${email}?`)) return;
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/${user.user.id}?confirm=true`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert(`✅ ${data.message}`);
+                        onBack();
+                    } else if (data.balance) {
+                        // User has a balance — offer to zero and delete
+                        if (confirm(`❌ Cannot delete: user has ${data.balance} remaining balance.\n\nClick OK to zero the balance and force-delete this user.`)) {
+                            await handleForceDelete();
+                        }
+                    } else {
+                        alert(`❌ ${data.error}`);
+                    }
+                } catch (e) { alert('Error: ' + e.message); }
+            };
+
+            const handleForceDelete = async () => {
+                const email = user?.user?.email;
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/${user.user.id}/force`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert(`✅ ${data.message}`);
+                        onBack();
+                    } else {
+                        alert(`❌ ${data.error}`);
+                    }
+                } catch (e) { alert('Error: ' + e.message); }
+            };
+
+            const handleSetBalance = async () => {
+                const correctedAmt = prompt(`Set wallet balance for ${user?.user?.email}:\n\nEnter new balance in dollars (e.g. 240.29):`);
+                if (correctedAmt === null) return;
+                const parsed = parseFloat(correctedAmt);
+                if (isNaN(parsed) || parsed < 0) { alert('Invalid amount'); return; }
+                if (!confirm(`Set balance to $${parsed.toFixed(2)} for ${user?.user?.email}?`)) return;
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/users/${user.user.id}/set-balance`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ balance_dollars: parsed, reason: 'Admin manual correction' })
+                    });
+                    const data = await res.json();
+                    if (res.ok) { alert(`✅ ${data.message}\n\nOld: ${data.old_balance} → New: ${data.new_balance}`); loadStripeBalance(); }
+                    else { alert(`Error: ${data.error}`); }
+                } catch (e) { alert('Error: ' + e.message); }
+            };
+
+            const handleSendPayout = async () => {
+                if (!payoutAmount || parseFloat(payoutAmount) <= 0) {
+                    setMessage({ type: 'error', text: 'Enter a valid amount' });
+                    return;
+                }
+
+                setShowConfirm(false);
+                setSending(true);
+                setMessage({ type: '', text: '' });
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/users/${user.user.id}/send-funds`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            amount: Math.round(parseFloat(payoutAmount) * 100), // Convert to cents
+                            instant: false  // Admin always uses standard payout
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        setMessage({ 
+                            type: 'success', 
+                            text: data.message || `Successfully sent $${payoutAmount} to user's bank account!`
+                        });
+                        setPayoutAmount('');
+                    } else {
+                        setMessage({ type: 'error', text: data.error || 'Failed to send funds' });
+                    }
+                } catch (error) {
+                    setMessage({ type: 'error', text: 'Error sending funds' });
+                } finally {
+                    setSending(false);
+                }
+            };
+
+            return (
+                <div className="p-8">
+                    <button
+                        onClick={onBack}
+                        className="flex items-center text-blue-600 hover:text-blue-800 mb-6"
+                    >
+                        <i data-lucide="arrow-left" className="w-4 h-4 mr-2"></i>
+                        Back to Users
+                    </button>
+
+                    <div className="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">User Details</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium text-gray-500">Name</label>
+                                <p className="text-gray-900">{user.user.name}</p>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-gray-500">Email</label>
+                                <p className="text-gray-900">{user.user.email}</p>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-gray-500">User ID</label>
+                                <p className="text-gray-900 font-mono text-sm">{user.user.id}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-sm font-medium text-gray-500">Stripe Account</label>
+                                    {user.user.stripe_account_id && !editingAccountId && (
+                                        <button
+                                            onClick={() => {
+                                                setEditingAccountId(true);
+                                                setNewAccountId(user.user.stripe_account_id);
+                                            }}
+                                            className="text-sm text-blue-600 hover:text-blue-800"
+                                        >
+                                            <i data-lucide="edit-2" className="w-4 h-4 inline mr-1"></i>
+                                            Update Account ID
+                                        </button>
+                                    )}
+                                </div>
+                                {!editingAccountId ? (
+                                    <p className="text-gray-900 font-mono text-sm break-all">
+                                        {user.user.stripe_account_id || 'Not connected'}
+                                    </p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            value={newAccountId}
+                                            onChange={(e) => setNewAccountId(e.target.value)}
+                                            placeholder="acct_..."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={updateStripeAccountId}
+                                                disabled={updatingAccountId}
+                                                className="px-4 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                                            >
+                                                {updatingAccountId ? 'Updating...' : 'Save'}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingAccountId(false);
+                                                    setNewAccountId('');
+                                                }}
+                                                className="px-4 py-1 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-yellow-600">
+                                            ⚠️ Warning: Only update if you know the correct live account ID. Wrong ID will break payouts!
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            {user.wallet && (
+                                <>
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-500">Wallet Balance</label>
+                                        <p className="text-gray-900">${(user.wallet.balance / 100).toFixed(2)}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-500">Platform Credit</label>
+                                        <p className="text-gray-900">${(user.wallet.platform_credit / 100).toFixed(2)}</p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Stripe Restriction Info */}
+                    {stripeStatus && (
+                        <div className={`border rounded-lg p-4 mb-4 ${stripeStatus.status === 'restricted' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-medium text-gray-800">Stripe Account Status</p>
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${stripeStatus.status === 'restricted' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                    {stripeStatus.status === 'restricted' ? '⚠️ Restricted' : '✅ Enabled'}
+                                </span>
+                            </div>
+                            {stripeStatus.requirements?.disabled_reason && (
+                                <p className="text-xs text-red-700 mb-1"><strong>Disabled reason:</strong> {stripeStatus.requirements.disabled_reason}</p>
+                            )}
+                            {stripeStatus.requirements?.currently_due?.length > 0 && (
+                                <p className="text-xs text-orange-700 mb-1"><strong>Currently due:</strong> {stripeStatus.requirements.currently_due.join(', ')}</p>
+                            )}
+                            {stripeStatus.requirements?.errors?.length > 0 && (
+                                <ul className="text-xs text-red-700 mb-1">
+                                    {stripeStatus.requirements.errors.map((e, i) => (
+                                        <li key={i}>• {e.requirement}: {e.reason}</li>
+                                    ))}
+                                </ul>
+                            )}
+                            {stripeStatus.status === 'restricted' && stripeStatus.request_link && (
+                                <a href={stripeStatus.request_link} target="_blank" rel="noopener noreferrer"
+                                   className="inline-block mt-2 text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+                                    Request Info →
+                                </a>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Danger Zone — Delete User */}
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-red-800">🗑️ Delete User Account</p>
+                            <p className="text-xs text-red-600">Permanently deletes this user and all their data. Balance must be $0 first.</p>
+                        </div>
+                        <button
+                            onClick={handleDeleteUser}
+                            className="ml-4 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                            Delete User
+                        </button>
+                    </div>
+
+                    {/* Balance Correction */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-yellow-800">⚠️ Balance Correction</p>
+                            <p className="text-xs text-yellow-700">Manually set this user's wallet balance (use for data corrections only)</p>
+                        </div>
+                        <button
+                            onClick={handleSetBalance}
+                            className="ml-4 px-4 py-2 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
+                        >
+                            Set Balance
+                        </button>
+                    </div>
+
+                    {/* Send Funds from Platform */}
+                    {user.user.stripe_account_id && (
+                        <div className="bg-white rounded-lg shadow p-6 mb-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-gray-900">Send Funds from Platform</h3>
+                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Your Balance → User's Bank</span>
+                            </div>
+                            
+                            {message.text && (
+                                <div className={`mb-4 p-3 rounded ${
+                                    message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+
+                            <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
+                                <p className="text-sm text-blue-800">
+                                    <strong>Note:</strong> This sends money from YOUR platform balance to the user's bank account 
+                                    (same as Stripe Dashboard "Add Funds" feature).
+                                </p>
+                            </div>
+
+                            {/* Payout Form */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Amount ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        value={payoutAmount}
+                                        onChange={(e) => setPayoutAmount(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={() => setShowConfirm(true)}
+                                    disabled={!payoutAmount || sending}
+                                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                >
+                                    {sending ? 'Sending...' : `Send $${payoutAmount || '0.00'} to Bank`}
+                                </button>
+
+                                <p className="text-xs text-gray-500">
+                                    Funds will arrive in the user's bank account in 1-2 business days.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Confirmation Dialog */}
+                    {showConfirm && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Confirm Payment</h3>
+                                <p className="text-gray-700 mb-4">
+                                    Send <strong>${payoutAmount}</strong> from platform balance to <strong>{user.user.name}'s bank account</strong>?
+                                </p>
+                                <p className="text-sm text-gray-500 mb-6">
+                                    Funds will arrive in 1-2 business days.
+                                </p>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={handleSendPayout}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Confirm
+                                    </button>
+                                    <button
+                                        onClick={() => setShowConfirm(false)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Payouts Panel */}
+                    {user.user.stripe_account_id && (
+                        <div className="bg-white rounded-lg shadow p-6 mb-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-gray-900">Payouts</h3>
+                                <button onClick={loadPayouts} className="text-sm text-blue-600 hover:text-blue-800">↻ Refresh</button>
+                            </div>
+                            {loadingPayouts ? (
+                                <p className="text-gray-400 text-sm">Loading payouts...</p>
+                            ) : !payoutsData ? (
+                                <p className="text-gray-400 text-sm">No payout data</p>
+                            ) : (
+                                <div>
+                                    {/* Charges Summary */}
+                                    {payoutsData.charges_summary && payoutsData.charges_summary.count > 0 && (
+                                        <div className="mb-6">
+                                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Charges Summary</h4>
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-right text-gray-500 border-b">
+                                                        <th className="text-left pb-1">Type</th>
+                                                        <th className="pb-1">Count</th>
+                                                        <th className="pb-1">Gross</th>
+                                                        <th className="pb-1">Fees</th>
+                                                        <th className="pb-1">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr className="text-right">
+                                                        <td className="text-left py-1">Charges</td>
+                                                        <td>{payoutsData.charges_summary.count}</td>
+                                                        <td>${(payoutsData.charges_summary.gross / 100).toFixed(2)}</td>
+                                                        <td>${(payoutsData.charges_summary.fees / 100).toFixed(2)}</td>
+                                                        <td className="font-semibold">${(payoutsData.charges_summary.total / 100).toFixed(2)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* Payout List */}
+                                    {payoutsData.payouts.length === 0 ? (
+                                        <p className="text-gray-400 text-sm">No payouts yet</p>
+                                    ) : payoutsData.payouts.map(p => (
+                                        <div key={p.id} className="border rounded-lg p-4 mb-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div>
+                                                    <span className="text-xl font-bold text-gray-900">${(p.amount / 100).toFixed(2)} {p.currency.toUpperCase()}</span>
+                                                    <span className={`ml-2 text-xs px-2 py-1 rounded font-medium ${statusBadge(p.status)}`}>
+                                                        {p.status.replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                                <span className="text-sm text-gray-500">
+                                                    Expected {new Date(p.arrival_date * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                </span>
+                                            </div>
+
+                                            {/* Timeline */}
+                                            <div className="mb-3">
+                                                <p className="text-xs font-semibold text-gray-600 mb-1">Timeline</p>
+                                                <div className="space-y-1 text-xs text-gray-600 pl-2 border-l-2 border-blue-200">
+                                                    <div className="flex justify-between">
+                                                        <span>Payout expected to complete</span>
+                                                        <span>{new Date(p.arrival_date * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                                    </div>
+                                                    {p.status === 'in_transit' && (
+                                                        <div className="flex justify-between font-medium text-blue-700">
+                                                            <span>Payout in transit</span>
+                                                            <span>{new Date(p.created * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(p.arrival_date * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between">
+                                                        <span>Payout initiated {p.method === 'instant' ? 'instantly' : 'automatically'}</span>
+                                                        <span>{new Date(p.created * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Account Details */}
+                                            {p.destination && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-gray-600 mb-1">Account Details</p>
+                                                    <div className="flex items-center justify-between text-sm bg-gray-50 rounded p-2">
+                                                        <span className="text-gray-700">
+                                                            {p.destination.brand || p.destination.bank_name || 'Bank'} •••• •••• •••• {p.destination.last4}
+                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            {p.destination.instant_eligible && (
+                                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Instant eligible</span>
+                                                            )}
+                                                            <span className="text-xs text-gray-500">{p.destination.currency?.toUpperCase()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
+                        {user.transactions && user.transactions.length > 0 ? (
+                            <div className="space-y-3">
+                                {user.transactions.slice(0, 10).map(txn => (
+                                    <div key={txn.id} className="flex items-center justify-between pb-3 border-b last:border-0">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">{txn.type}</p>
+                                            <p className="text-xs text-gray-500">{new Date(txn.created_at).toLocaleString()}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-gray-900">${(txn.amount / 100).toFixed(2)}</p>
+                                            <span className={`text-xs px-2 py-1 rounded ${
+                                                txn.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                txn.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`}>
+                                                {txn.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 text-sm">No transactions yet</p>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Transactions Page - Full Implementation
+        function TransactionsPage({ embedded = false }) {
+            const [transactions, setTransactions] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [statusFilter, setStatusFilter] = useState('');
+            const [typeFilter, setTypeFilter] = useState('');
+            const [userFilter, setUserFilter] = useState('');
+            const [stripeDetails, setStripeDetails] = useState({});
+            const [detailModal, setDetailModal] = useState(null);
+            const [loadingDetail, setLoadingDetail] = useState(false);
+
+            useEffect(() => {
+                loadTransactions();
+                lucide.createIcons();
+            }, [statusFilter, typeFilter,userFilter]);
+
+            const viewStripeDetail = async (txId) => {
+                setLoadingDetail(true);
+                setDetailModal({ loading: true });
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const res = await fetch(`${API_BASE}/transactions/${txId}/stripe-detail`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setDetailModal(data);
+                } catch (e) {
+                    setDetailModal({ error: e.message });
+                } finally {
+                    setLoadingDetail(false);
+                }
+            };
+
+            const loadTransactions = async () => {
+                try {
+                    setLoading(true);
+                    const token = localStorage.getItem('admin_token');
+                    const params = new URLSearchParams();
+                    if (statusFilter) params.append('status', statusFilter);
+                    if (typeFilter) params.append('type', typeFilter);
+                    if (userFilter) params.append('user_id', userFilter);
+                    
+                    const response = await fetch(`${API_BASE}/transactions?${params}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    const txList = data.transactions || [];
+                    setTransactions(txList);
+                    setUsers(data.users || []);
+
+                    // Enrich with Stripe data in background
+                    const ids = txList.filter(t => t.metadata?.payment_intent_id).map(t => t.id);
+                    if (ids.length > 0) {
+                        fetch(`${API_BASE}/transactions/stripe-enrich`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ transactionIds: ids })
+                        }).then(r => r.ok ? r.json() : null).then(enriched => {
+                            if (enriched) setStripeDetails(enriched);
+                        }).catch(() => {});
+                    }
+                } catch (error) {
+                    console.error('Failed to load transactions:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className={embedded ? '' : 'p-8'}>
+                    {!embedded && <h1 className="text-3xl font-bold text-gray-900 mb-8">Transaction Monitoring</h1>}
+
+                    <div className="bg-white rounded-lg shadow">
+                        <div className="p-6 border-b flex gap-4">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="completed">Completed</option>
+                                <option value="pending">Pending</option>
+                                <option value="failed">Failed</option>
+                            </select>
+
+                            <select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">All Types</option>
+                                <option value="transfer">Transfer</option>
+                                <option value="instant_payout">Instant Payout</option>
+                                <option value="wallet_credit">Wallet Credit</option>
+                            </select>
+
+                            <select
+                                value={userFilter}
+                                onChange={(e) => setUserFilter(e.target.value)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">All Users</option>
+                                {users.map(txn => 
+                                     <option value={txn.id}>{txn.name}</option>
+                                )}
+                            </select>
+
+                            <button
+                                onClick={() => { setStatusFilter(''); setTypeFilter('');setUserFilter(''); }}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-500">Loading transactions...</div>
+                        ) : transactions.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">No transactions found</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stripe</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {transactions.map(txn => (
+                                            <tr key={txn.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    {new Date(txn.created_at).toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm text-gray-900">{txn.sender_name || 'N/A'}</div>
+                                                    <div className="text-xs text-gray-500">{txn.sender_email || ''}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm text-gray-900">{txn.recipient_name || 'N/A'}</div>
+                                                    <div className="text-xs text-gray-500">{txn.recipient_email || ''}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                                    ${(txn.amount / 100).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                                                        {txn.type || 'transfer'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`text-xs px-2 py-1 rounded font-medium ${
+                                                        txn.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                        txn.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-red-100 text-red-800'
+                                                    }`}>
+                                                        {txn.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-700">
+                                                    {stripeDetails[txn.id] ? (
+                                                        <span>{stripeDetails[txn.id].brand} ••••{stripeDetails[txn.id].last4}</span>
+                                                    ) : <span className="text-gray-400">—</span>}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {txn.metadata?.payment_intent_id ? (
+                                                        <button
+                                                            onClick={() => viewStripeDetail(txn.id)}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                                        >
+                                                            Details
+                                                        </button>
+                                                    ) : <span className="text-gray-400 text-xs">—</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Stripe Detail Modal — must be inside the root div */}
+                    {detailModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-screen overflow-y-auto">
+                            <div className="p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold text-gray-900">Stripe Payment Detail</h3>
+                                    <button onClick={() => setDetailModal(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">×</button>
+                                </div>
+                                {detailModal.loading ? (
+                                    <div className="text-center py-8 text-gray-500">Loading...</div>
+                                ) : detailModal.error ? (
+                                    <div className="text-red-600 text-sm">{detailModal.error}</div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-medium mb-1">Payment Intent ID</p>
+                                            <p className="text-sm font-mono text-gray-800">{detailModal.id}</p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium mb-1">Status</p>
+                                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                                    detailModal.status === 'succeeded' ? 'bg-green-100 text-green-800' :
+                                                    detailModal.status === 'requires_payment_method' || detailModal.status === 'canceled' ? 'bg-red-100 text-red-800' :
+                                                    'bg-yellow-100 text-yellow-800'
+                                                }`}>{detailModal.status}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium mb-1">Amount</p>
+                                                <p className="text-sm font-bold text-gray-900">${(detailModal.amount / 100).toFixed(2)} {detailModal.currency?.toUpperCase()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium mb-1">Created</p>
+                                                <p className="text-sm text-gray-700">{detailModal.created ? new Date(detailModal.created * 1000).toLocaleString() : '—'}</p>
+                                            </div>
+                                        </div>
+                                        {detailModal.payment_method && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium mb-1">Card</p>
+                                                <p className="text-sm text-gray-800">
+                                                    {detailModal.payment_method.brand} ••••{detailModal.payment_method.last4}
+                                                    {detailModal.payment_method.network && <span className="ml-2 text-xs text-gray-500">({detailModal.payment_method.network})</span>}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {detailModal.charges && detailModal.charges.length > 0 && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 font-medium mb-2">Charges</p>
+                                                {detailModal.charges.map(c => (
+                                                    <div key={c.id} className="bg-gray-50 rounded p-3 text-xs mb-2">
+                                                        <div className="flex justify-between mb-1">
+                                                            <span className="font-mono text-gray-600">{c.id}</span>
+                                                            <span className={`font-semibold ${c.paid ? 'text-green-700' : 'text-red-700'}`}>{c.paid ? 'Paid' : 'Not paid'}</span>
+                                                        </div>
+                                                        <div className="flex gap-4 text-gray-600">
+                                                            <span>Amount: ${(c.amount / 100).toFixed(2)}</span>
+                                                            <span>Status: {c.status}</span>
+                                                            {c.refunded && <span className="text-orange-600">Refunded</span>}
+                                                        </div>
+                                                        {c.failure_code && (
+                                                            <p className="text-red-600 mt-1">{c.failure_code}: {c.failure_message}</p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+        }
+
+        // Platform Advances Page - Full Implementation
+        function AdvancesPage() {
+            const [advances, setAdvances] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                loadAdvances();
+                lucide.createIcons();
+            }, []);
+
+            const loadAdvances = async () => {
+                try {
+                    setLoading(true);
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/advances/pending`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setAdvances(data.advances || []);
+                } catch (error) {
+                    console.error('Failed to load advances:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const approveAdvance = async (advanceId) => {
+                if (!confirm('Are you sure you want to approve this advance?')) return;
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/advances/${advanceId}/approve`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.ok) {
+                        alert('Advance approved successfully!');
+                        loadAdvances();
+                    } else {
+                        alert('Failed to approve advance');
+                    }
+                } catch (error) {
+                    alert('Error approving advance');
+                }
+            };
+
+            const denyAdvance = async (advanceId) => {
+                const reason = prompt('Enter reason for denial:');
+                if (!reason) return;
+
+                // Optimistic update — remove from list immediately
+                setAdvances(prev => prev.filter(a => a.id !== advanceId));
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/advances/${advanceId}/deny`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ reason })
+                    });
+
+                    if (!response.ok) {
+                        // Revert on failure
+                        alert('Failed to deny advance — reloading list');
+                        loadAdvances();
+                    }
+                    // Success: already removed from UI, no alert needed
+                } catch (error) {
+                    alert('Error denying advance — reloading list');
+                    loadAdvances();
+                }
+            };
+
+            return (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900">Platform Advances</h1>
+                        <button
+                            onClick={loadAdvances}
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            <i data-lucide="refresh-cw" className="w-4 h-4"></i>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow">
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-500">Loading advances...</div>
+                        ) : advances.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">
+                                <i data-lucide="check-circle" className="w-12 h-12 mx-auto mb-4 text-green-500"></i>
+                                <p>No pending advances</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Net</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {advances.map(advance => (
+                                            <tr key={advance.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm font-medium text-gray-900">{advance.user_name}</div>
+                                                    <div className="text-xs text-gray-500">{advance.user_email}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                                                    ${(advance.amount / 100).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    ${(advance.fee / 100).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-900">
+                                                    ${(advance.net_amount / 100).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500">
+                                                    {new Date(advance.advanced_at).toLocaleString()}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex space-x-2">
+                                                        <button
+                                                            onClick={() => approveAdvance(advance.id)}
+                                                            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            onClick={() => denyAdvance(advance.id)}
+                                                            className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                                                        >
+                                                            Deny
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Reports Page - Full Implementation
+        function ReportsPage() {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [timeRange, setTimeRange] = useState('7d');
+
+            useEffect(() => {
+                loadStats();
+                lucide.createIcons();
+            }, []);
+
+            const loadStats = async () => {
+                try {
+                    setLoading(true);
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/stats`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setStats(data);
+                } catch (error) {
+                    console.error('Failed to load stats:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="p-8">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-8">Reports & Analytics</h1>
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <p className="text-gray-600">Loading reports...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="p-8">
+                    <div className="flex justify-between items-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
+                        <select
+                            value={timeRange}
+                            onChange={(e) => setTimeRange(e.target.value)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="90d">Last 90 Days</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-blue-500 p-3 rounded-lg">
+                                    <i data-lucide="users" className="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{stats?.total_users || 0}</div>
+                            <div className="text-sm text-gray-600">Total Users</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-green-500 p-3 rounded-lg">
+                                    <i data-lucide="credit-card" className="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">{stats?.total_transactions || 0}</div>
+                            <div className="text-sm text-gray-600">Total Transactions</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-purple-500 p-3 rounded-lg">
+                                    <i data-lucide="dollar-sign" className="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                                ${(stats?.transaction_volume || 0).toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-600">Transaction Volume</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="bg-orange-500 p-3 rounded-lg">
+                                    <i data-lucide="trending-up" className="w-6 h-6 text-white"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                                ${(stats?.platform_revenue || 0).toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-600">Platform Revenue</div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Breakdown</h3>
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between pb-3 border-b">
+                                    <span className="text-sm text-gray-600">Instant Payout Fees (1.5%)</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                        ${((stats?.platform_revenue || 0) * 0.5).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between pb-3 border-b">
+                                    <span className="text-sm text-gray-600">Wallet Credit Fees (2%)</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                        ${((stats?.platform_revenue || 0) * 0.3).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-600">Platform Advance Fees</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                        ${((stats?.platform_revenue || 0) * 0.2).toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                            <div className="space-y-3">
+                                <button className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-between">
+                                    <span className="text-sm text-gray-700">Export User Data (CSV)</span>
+                                    <i data-lucide="download" className="w-4 h-4 text-gray-400"></i>
+                                </button>
+                                <button className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-between">
+                                    <span className="text-sm text-gray-700">Export Transactions (CSV)</span>
+                                    <i data-lucide="download" className="w-4 h-4 text-gray-400"></i>
+                                </button>
+                                <button className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center justify-between">
+                                    <span className="text-sm text-gray-700">Generate Revenue Report (PDF)</span>
+                                    <i data-lucide="file-text" className="w-4 h-4 text-gray-400"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Settings Page with Stripe Key Management
+        function SettingsPage() {
+            return (
+                <div className="p-8">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+                    <PasswordChange />
+                    <StripeSettings />
+                    <FeeSettings />
+                </div>
+            );
+        }
+
+        // Password Change Component
+        function PasswordChange() {
+            const [currentPassword, setCurrentPassword] = useState('');
+            const [newPassword, setNewPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
+            const [saving, setSaving] = useState(false);
+            const [message, setMessage] = useState({ type: '', text: '' });
+
+            const handlePasswordChange = async (e) => {
+                e.preventDefault();
+                setMessage({ type: '', text: '' });
+
+                // Validation
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                    setMessage({ type: 'error', text: 'All fields are required' });
+                    return;
+                }
+
+                if (newPassword.length < 8) {
+                    setMessage({ type: 'error', text: 'New password must be at least 8 characters' });
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    setMessage({ type: 'error', text: 'New passwords do not match' });
+                    return;
+                }
+
+                setSaving(true);
+
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/auth/change-password`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            currentPassword,
+                            newPassword
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        setMessage({ type: 'success', text: 'Password changed successfully!' });
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        
+                        // Auto-clear success message after 3 seconds
+                        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                    } else {
+                        setMessage({ type: 'error', text: data.error || 'Failed to change password' });
+                    }
+                } catch (error) {
+                    setMessage({ type: 'error', text: 'Error changing password' });
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">Change Password</h2>
+                    
+                    <form onSubmit={handlePasswordChange} className="max-w-md">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Current Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                    minLength="8"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Confirm New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+
+                            {message.text && (
+                                <div className={`p-3 rounded-lg ${
+                                    message.type === 'success' 
+                                        ? 'bg-green-50 border border-green-200 text-green-800' 
+                                        : 'bg-red-50 border border-red-200 text-red-800'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {saving ? 'Changing Password...' : 'Change Password'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            );
+        }
+
+        // Stripe Settings Component
+        function StripeSettings() {
+            const [settings, setSettings] = useState({});
+            const [showKeys, setShowKeys] = useState(false);
+            const [editing, setEditing] = useState(false);
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => {
+                loadSettings();
+            }, []);
+
+            const loadSettings = async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/settings/stripe`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setSettings(data.settings || {});
+                } catch (error) {
+                    console.error('Failed to load settings:', error);
+                }
+            };
+
+            const saveSettings = async () => {
+                setSaving(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/settings/stripe`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(settings)
+                    });
+
+                    if (response.ok) {
+                        alert('Settings saved successfully!');
+                        setEditing(false);
+                        loadSettings();
+                    } else {
+                        alert('Failed to save settings');
+                    }
+                } catch (error) {
+                    alert('Error saving settings');
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            const maskKey = (key) => {
+                if (!key) return '••••••••••••••••';
+                return key.substring(0, 7) + '••••••••••' + key.substring(key.length - 4);
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900">Stripe Configuration</h2>
+                        {!editing && (
+                            <button
+                                onClick={() => setEditing(true)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Edit
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* Stripe Mode Toggle */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Stripe Mode
+                            </label>
+                            <select
+                                value={settings.stripe_mode || 'test'}
+                                onChange={(e) => setSettings({...settings, stripe_mode: e.target.value})}
+                                disabled={!editing}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            >
+                                <option value="test">Test Mode</option>
+                                <option value="live">Live Mode</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Currently using: {settings.stripe_mode === 'live' ? '🔴 LIVE MODE' : '🟢 TEST MODE'}
+                            </p>
+                        </div>
+
+                        {/* Test Keys */}
+                        <div className="border-t pt-6">
+                            <h3 className="font-medium text-gray-900 mb-4">Test Mode Keys</h3>
+                            
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Secret Key
+                                </label>
+                                <div className="flex space-x-2">
+                                    <input
+                                        type={showKeys ? 'text' : 'password'}
+                                        value={editing ? (settings.stripe_test_secret_key || '') : maskKey(settings.stripe_test_secret_key)}
+                                        onChange={(e) => setSettings({...settings, stripe_test_secret_key: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="sk_test_..."
+                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                    <button
+                                        onClick={() => setShowKeys(!showKeys)}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        <i data-lucide={showKeys ? 'eye-off' : 'eye'} className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Publishable Key
+                                </label>
+                                <input
+                                    type="text"
+                                    value={settings.stripe_test_publishable_key || ''}
+                                    onChange={(e) => setSettings({...settings, stripe_test_publishable_key: e.target.value})}
+                                    disabled={!editing}
+                                    placeholder="pk_test_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Live Keys */}
+                        <div className="border-t pt-6">
+                            <h3 className="font-medium text-gray-900 mb-4">Live Mode Keys</h3>
+                            
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Secret Key
+                                </label>
+                                <div className="flex space-x-2">
+                                    <input
+                                        type={showKeys ? 'text' : 'password'}
+                                        value={editing ? (settings.stripe_live_secret_key || '') : maskKey(settings.stripe_live_secret_key)}
+                                        onChange={(e) => setSettings({...settings, stripe_live_secret_key: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="sk_live_..."
+                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                    <button
+                                        onClick={() => setShowKeys(!showKeys)}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        <i data-lucide={showKeys ? 'eye-off' : 'eye'} className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Publishable Key
+                                </label>
+                                <input
+                                    type="text"
+                                    value={settings.stripe_live_publishable_key || ''}
+                                    onChange={(e) => setSettings({...settings, stripe_live_publishable_key: e.target.value})}
+                                    disabled={!editing}
+                                    placeholder="pk_live_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                />
+                            </div>
+                        </div>
+
+                        {editing && (
+                            <div className="flex space-x-4 pt-6">
+                                <button
+                                    onClick={saveSettings}
+                                    disabled={saving}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditing(false);
+                                        loadSettings();
+                                    }}
+                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Fee Settings Component
+        function FeeSettings() {
+            const [fees, setFees] = useState({});
+            const [editing, setEditing] = useState(false);
+            const [saving, setSaving] = useState(false);
+
+            useEffect(() => {
+                loadFees();
+            }, []);
+
+            const loadFees = async () => {
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/settings/fees`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    setFees(data.fees || {});
+                } catch (error) {
+                    console.error('Failed to load fees:', error);
+                }
+            };
+
+            const saveFees = async () => {
+                setSaving(true);
+                try {
+                    const token = localStorage.getItem('admin_token');
+                    const response = await fetch(`${API_BASE}/settings/fees`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(fees)
+                    });
+
+                    if (response.ok) {
+                        alert('Fee settings saved successfully!');
+                        setEditing(false);
+                        loadFees();
+                    } else {
+                        alert('Failed to save fee settings');
+                    }
+                } catch (error) {
+                    alert('Error saving fee settings');
+                } finally {
+                    setSaving(false);
+                }
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-semibold text-gray-900">Fee Configuration</h2>
+                        {!editing && (
+                            <button
+                                onClick={() => setEditing(true)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Edit
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="space-y-6">
+                        {/* User-to-User Transfer Fees */}
+                        <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">User-to-User Transfer Fee</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Transfer Fee (%) <span className="text-gray-400 text-xs">(default: 5%)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        value={fees.user_transfer_fee_pct || ''}
+                                        onChange={(e) => setFees({...fees, user_transfer_fee_pct: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="5"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Minimum Fee (cents) <span className="text-gray-400 text-xs">(100 = $1.00)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={fees.user_transfer_fee_min || ''}
+                                        onChange={(e) => setFees({...fees, user_transfer_fee_min: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="100"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Sender is debited the full amount. Receiver gets amount minus fee. Fee goes to platform.</p>
+                        </div>
+
+                        {/* Payment Request Fee */}
+                        <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">Payment Request Fee</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Payment Request Fee (%) <span className="text-gray-400 text-xs">(default: 5%)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        value={fees.payment_request_fee_pct || ''}
+                                        onChange={(e) => setFees({...fees, payment_request_fee_pct: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="5"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Minimum Fee (cents) <span className="text-gray-400 text-xs">(100 = $1.00)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={fees.payment_request_fee_min || ''}
+                                        onChange={(e) => setFees({...fees, payment_request_fee_min: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="100"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">When someone pays a payment request, the sender (payer) is charged this fee on top of the requested amount. Fee goes to platform.</p>
+                        </div>
+
+                        {/* Bank-to-Wallet (Add Funds) */}
+                        <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">Bank-to-Wallet (Add Funds)</h3>
+                            <div className="flex items-center mb-2">
+                                <input
+                                    type="checkbox"
+                                    id="pass_stripe_fee_to_user"
+                                    checked={fees.pass_stripe_fee_to_user !== 'false' && fees.pass_stripe_fee_to_user !== false}
+                                    onChange={(e) => setFees({...fees, pass_stripe_fee_to_user: e.target.checked ? 'true' : 'false'})}
+                                    disabled={!editing}
+                                    className="mr-2 h-4 w-4 accent-blue-600"
+                                />
+                                <label htmlFor="pass_stripe_fee_to_user" className="text-sm font-medium text-gray-700">
+                                    Pass Stripe processing fee (2.9% + $0.30) to user
+                                </label>
+                            </div>
+                            <p className="text-xs text-gray-500">When enabled, user pays the Stripe fee on top of their deposit so their wallet gets the exact amount they requested. When disabled, platform absorbs the fee.</p>
+                        </div>
+
+                        {/* Cash Out Fees */}
+                        <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">Cash Out (Wallet-to-Bank) Admin Fee</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Cash Out Fee (%) <span className="text-gray-400 text-xs">(default: 5%)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        value={fees.cashout_fee_pct || ''}
+                                        onChange={(e) => setFees({...fees, cashout_fee_pct: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="5"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Minimum Fee (cents) <span className="text-gray-400 text-xs">(100 = $1.00)</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={fees.cashout_fee_min || ''}
+                                        onChange={(e) => setFees({...fees, cashout_fee_min: e.target.value})}
+                                        disabled={!editing}
+                                        placeholder="100"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">Admin fee is deducted from cash out amount. Stripe payout fee ($0.25 standard / instant %) is also deducted separately.</p>
+                        </div>
+
+                        {/* Cash Out Method Toggles */}
+                        <div className="border-b pb-4">
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">Cash Out Methods</h3>
+                            <div className="flex items-center mb-2">
+                                <input
+                                    type="checkbox"
+                                    id="standard_cashout_enabled"
+                                    checked={fees.standard_cashout_enabled !== 'false' && fees.standard_cashout_enabled !== false}
+                                    onChange={(e) => setFees({...fees, standard_cashout_enabled: e.target.checked ? 'true' : 'false'})}
+                                    disabled={!editing}
+                                    className="mr-2 h-4 w-4 accent-blue-600"
+                                />
+                                <label htmlFor="standard_cashout_enabled" className="text-sm font-medium text-gray-700">
+                                    Enable Standard Cash Out
+                                </label>
+                            </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Standard Cash Out Fee (%) <span className="text-gray-400 text-xs">(0 = FREE, legacy)</span>
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={fees.standard_cashout_fee_percent || ''}
+                                onChange={(e) => setFees({...fees, standard_cashout_fee_percent: e.target.value})}
+                                disabled={!editing}
+                                placeholder="0"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 mb-3"
+                            />
+
+                            <div className="flex items-center mb-2">
+                                <input
+                                    type="checkbox"
+                                    id="instant_payout_enabled"
+                                    checked={fees.instant_payout_enabled !== 'false' && fees.instant_payout_enabled !== false}
+                                    onChange={(e) => setFees({...fees, instant_payout_enabled: e.target.checked ? 'true' : 'false'})}
+                                    disabled={!editing}
+                                    className="mr-2 h-4 w-4 accent-blue-600"
+                                />
+                                <label htmlFor="instant_payout_enabled" className="text-sm font-medium text-gray-700">
+                                    Enable Instant Payout
+                                </label>
+                            </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Instant Payout Fee (%)
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={fees.instant_payout_fee_percent || ''}
+                                onChange={(e) => setFees({...fees, instant_payout_fee_percent: e.target.value})}
+                                disabled={!editing}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            />
+                        </div>
+
+                        {/* Wallet Credit Fee */}
+                        <div>
+                            <h3 className="text-lg font-medium text-gray-800 mb-3">Wallet Credit Fee</h3>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Wallet Credit Fee (%)
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={fees.wallet_credit_fee_percent || ''}
+                                onChange={(e) => setFees({...fees, wallet_credit_fee_percent: e.target.value})}
+                                disabled={!editing}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                            />
+                        </div>
+
+                        {editing && (
+                            <div className="flex space-x-4 pt-4">
+                                <button
+                                    onClick={saveFees}
+                                    disabled={saving}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditing(false);
+                                        loadFees();
+                                    }}
+                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        ReactDOM.render(<AdminApp />, document.getElementById('admin-root'));
+    </script>
+</body>
+</html>

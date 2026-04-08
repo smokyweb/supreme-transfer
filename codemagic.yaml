@@ -1,0 +1,205 @@
+﻿workflows:
+  ios-release:
+    name: Supreme Transfer iOS
+    max_build_duration: 60
+    environment:
+      groups:
+        - ios_signing
+      vars:
+        BUNDLE_ID: com.bluesapps.supremetransfer
+        TEAM_ID: YQGQU3RV34
+      node: 22.14.0
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'latest-changes'
+          include: true
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Install Capacitor CLI
+        script: npm install -g @capacitor/cli
+      - name: Add iOS platform
+        script: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+      - name: Sync Capacitor
+        script: npx cap sync ios
+      - name: Set bundle id and version
+        script: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 24" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" ios/App/App/Info.plist
+      - name: Set up code signing
+        script: |
+          keychain initialize
+
+          # Step 1: Delete all stale certs + profiles via REST API
+          python3 setup_signing.py
+
+          # Step 2: Export generated private key so fetch-signing-files can create cert
+          export CERTIFICATE_PRIVATE_KEY=$(cat /tmp/dist_signing.key)
+
+          # Step 3: Let Codemagic CLI create fresh cert + profile + import to keychain
+          app-store-connect fetch-signing-files $BUNDLE_ID \
+            --type IOS_APP_STORE \
+            --create -v
+
+          # Step 3: Import cert into keychain
+          keychain add-certificates
+
+          # Step 4: Apply profiles to Xcode project
+          xcode-project use-profiles --project ios/App/App.xcodeproj
+
+          echo "--- Profiles on disk (broad search) ---"
+          find ~ -name "*.mobileprovision" 2>/dev/null || echo "none found anywhere in ~"
+          echo "--- Certs on disk ---"
+          find ~ -name "*.p12" -o -name "*.cer" 2>/dev/null | head -20
+          echo "--- MobileDevice dir ---"
+          ls -la ~/Library/MobileDevice/ 2>/dev/null || echo "no MobileDevice dir"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "no Provisioning Profiles dir"
+      - name: Build iOS (SPM)
+        script: |
+          # Read the App Store profile name directly from Codemagic's generated plist
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :provisioningProfiles:$BUNDLE_ID" /Users/builder/export_options.plist 2>/dev/null)
+          echo "Using profile: $PROFILE_NAME"
+
+          cd ios/App
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath $CM_BUILD_DIR/App.xcarchive \
+            -destination "generic/platform=iOS" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_NAME" \
+            archive
+      - name: Export IPA
+        script: |
+          echo "--- Codemagic export_options.plist ---"
+          cat /Users/builder/export_options.plist
+          /usr/libexec/PlistBuddy -c "Set :method app-store-connect" /Users/builder/export_options.plist
+          echo "--- Patched ---"
+          cat /Users/builder/export_options.plist
+          xcodebuild \
+            -exportArchive \
+            -archivePath $CM_BUILD_DIR/App.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath $CM_BUILD_DIR/ipa \
+            -allowProvisioningUpdates
+    artifacts:
+      - $CM_BUILD_DIR/ipa/*.ipa
+      - $CM_BUILD_DIR/App.xcarchive
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        submit_to_app_store: true
+
+  ios-release-gw:
+    name: Supreme Transfer iOS (GW Account)
+    max_build_duration: 60
+    environment:
+      groups:
+        - ios_signing_gw
+      vars:
+        BUNDLE_ID: supremetransfer.app
+      node: 22.14.0
+      xcode: latest
+    # No automatic triggering — run manually from Codemagic dashboard
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Install Capacitor CLI
+        script: npm install -g @capacitor/cli
+      - name: Add iOS platform
+        script: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+      - name: Sync Capacitor
+        script: npx cap sync ios
+      - name: Set bundle id and version
+        script: |
+          # Patch Info.plist — use Set with Add fallback in case key doesn't exist yet
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" ios/App/App/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $BUNDLE_ID" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 31" ios/App/App/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 31" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 29" ios/App/App/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 29" ios/App/App/Info.plist
+          # Export compliance — declare no non-exempt encryption (HTTPS only)
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" ios/App/App/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+          # Verify
+          echo "BundleID: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' ios/App/App/Info.plist)"
+          echo "CFBundleVersion: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' ios/App/App/Info.plist)"
+          echo "CFBundleShortVersionString: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ios/App/App/Info.plist)"
+          echo "ExportCompliance: $(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' ios/App/App/Info.plist)"
+          # Patch project.pbxproj so use-profiles maps profile to correct bundle ID
+          sed -i '' 's/io\.supreme-transfer\.com/supremetransfer.app/g' ios/App/App.xcodeproj/project.pbxproj
+          echo "Bundle ID in project.pbxproj:"
+          grep -m3 "PRODUCT_BUNDLE_IDENTIFIER" ios/App/App.xcodeproj/project.pbxproj
+      - name: Set up code signing
+        script: |
+          keychain initialize
+
+          # Revoke stale certs + profiles on GW account, generate new RSA key
+          python3 setup_signing.py
+
+          export CERTIFICATE_PRIVATE_KEY=$(cat /tmp/dist_signing.key)
+
+          app-store-connect fetch-signing-files $BUNDLE_ID \
+            --type IOS_APP_STORE \
+            --create -v
+
+          keychain add-certificates
+          xcode-project use-profiles --project ios/App/App.xcodeproj
+
+          echo "--- Profiles on disk ---"
+          find ~ -name "*.mobileprovision" 2>/dev/null || echo "none found"
+      - name: Build iOS (SPM)
+        script: |
+          echo "=== export_options.plist ==="
+          cat /Users/builder/export_options.plist || echo "plist not found"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :provisioningProfiles:$BUNDLE_ID" /Users/builder/export_options.plist 2>/dev/null)
+          echo "Using profile: $PROFILE_NAME"
+
+          cd ios/App
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath $CM_BUILD_DIR/App.xcarchive \
+            -destination "generic/platform=iOS" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_NAME" \
+            archive
+      - name: Export IPA
+        script: |
+          /usr/libexec/PlistBuddy -c "Set :method app-store-connect" /Users/builder/export_options.plist
+          xcodebuild \
+            -exportArchive \
+            -archivePath $CM_BUILD_DIR/App.xcarchive \
+            -exportOptionsPlist /Users/builder/export_options.plist \
+            -exportPath $CM_BUILD_DIR/ipa \
+            -allowProvisioningUpdates
+    artifacts:
+      - $CM_BUILD_DIR/ipa/*.ipa
+      - $CM_BUILD_DIR/App.xcarchive
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        submit_to_app_store: true

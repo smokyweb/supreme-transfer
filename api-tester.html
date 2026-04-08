@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supreme Transfer API Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #667eea;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #5a67d8;
+        }
+        
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 250px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Supreme Transfer API Tester</h1>
+        <p>Test your API endpoints to make sure everything is working</p>
+        
+        <div class="test-section">
+            <h2>1. Login Test</h2>
+            <input type="email" id="email" placeholder="Email" value="kevin@knoxwebhq.com">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="testLogin()">Test Login</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>2. Balance Check</h2>
+            <button onclick="testBalance()">Check Balance</button>
+            <div id="balanceResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>3. User Info</h2>
+            <button onclick="testUserInfo()">Get User Info</button>
+            <div id="userResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>4. Transactions</h2>
+            <button onclick="testTransactions()">Get Transactions</button>
+            <div id="transactionsResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>5. Stripe Sync (Admin)</h2>
+            <button onclick="testStripeSync()">Sync Stripe Balances</button>
+            <button onclick="testCheckBalance()">Check Specific User Balance</button>
+            <div id="stripeSyncResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>6. Debug Endpoints</h2>
+            <button onclick="testDebugTables()">Check Database Tables</button>
+            <button onclick="testDebugUser()">Debug User Info</button>
+            <div id="debugResult" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Token:</h2>
+            <div id="tokenDisplay" class="result">No token yet - login first</div>
+        </div>
+    </div>
+    
+    <script>
+        // Update this with your Railway URL
+        const API_URL = 'https://kevin-supreme-transfer-app-production.up.railway.app';
+        let authToken = '';
+        
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!password) {
+                document.getElementById('loginResult').innerHTML = '❌ Please enter a password';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token;
+                    document.getElementById('loginResult').className = 'result success';
+                    document.getElementById('loginResult').innerHTML = 
+                        `✅ Login successful!\nUser: ${data.user.email}\nToken: ${authToken.substring(0, 20)}...`;
+                    document.getElementById('tokenDisplay').innerHTML = authToken;
+                } else {
+                    document.getElementById('loginResult').className = 'result error';
+                    document.getElementById('loginResult').innerHTML = 
+                        `❌ Login failed: ${data.message || data.error || 'Unknown error'}`;
+                }
+            } catch (error) {
+                document.getElementById('loginResult').className = 'result error';
+                document.getElementById('loginResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testBalance() {
+            if (!authToken) {
+                document.getElementById('balanceResult').innerHTML = '❌ Please login first';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/wallet/balance`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('balanceResult').className = 'result success';
+                    document.getElementById('balanceResult').innerHTML = 
+                        `✅ Balance: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('balanceResult').className = 'result error';
+                    document.getElementById('balanceResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('balanceResult').className = 'result error';
+                document.getElementById('balanceResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testUserInfo() {
+            if (!authToken) {
+                document.getElementById('userResult').innerHTML = '❌ Please login first';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('userResult').className = 'result success';
+                    document.getElementById('userResult').innerHTML = 
+                        `✅ User Info: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('userResult').className = 'result error';
+                    document.getElementById('userResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('userResult').className = 'result error';
+                document.getElementById('userResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testTransactions() {
+            if (!authToken) {
+                document.getElementById('transactionsResult').innerHTML = '❌ Please login first';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/transactions`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('transactionsResult').className = 'result success';
+                    document.getElementById('transactionsResult').innerHTML = 
+                        `✅ Transactions: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('transactionsResult').className = 'result error';
+                    document.getElementById('transactionsResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('transactionsResult').className = 'result error';
+                document.getElementById('transactionsResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testStripeSync() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/sync-stripe`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('stripeSyncResult').className = 'result success';
+                    document.getElementById('stripeSyncResult').innerHTML = 
+                        `✅ Stripe Sync: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('stripeSyncResult').className = 'result error';
+                    document.getElementById('stripeSyncResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('stripeSyncResult').className = 'result error';
+                document.getElementById('stripeSyncResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testCheckBalance() {
+            const email = document.getElementById('email').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/admin/check-balance/${email}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('stripeSyncResult').className = 'result success';
+                    document.getElementById('stripeSyncResult').innerHTML = 
+                        `✅ Balance Check: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('stripeSyncResult').className = 'result error';
+                    document.getElementById('stripeSyncResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('stripeSyncResult').className = 'result error';
+                document.getElementById('stripeSyncResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testDebugTables() {
+            try {
+                const response = await fetch(`${API_URL}/api/debug/tables`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('debugResult').className = 'result success';
+                    document.getElementById('debugResult').innerHTML = 
+                        `✅ Tables: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('debugResult').className = 'result error';
+                    document.getElementById('debugResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('debugResult').className = 'result error';
+                document.getElementById('debugResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+        
+        async function testDebugUser() {
+            const email = document.getElementById('email').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/api/debug/user/${email}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('debugResult').className = 'result success';
+                    document.getElementById('debugResult').innerHTML = 
+                        `✅ User Debug: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    document.getElementById('debugResult').className = 'result error';
+                    document.getElementById('debugResult').innerHTML = 
+                        `❌ Error: ${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                document.getElementById('debugResult').className = 'result error';
+                document.getElementById('debugResult').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
