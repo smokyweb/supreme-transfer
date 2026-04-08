@@ -1,4 +1,4 @@
-// COMPLETE CASHFLOW SERVER WITH INSTANT PAYOUTS & WALLET CREDITS
+﻿// COMPLETE CASHFLOW SERVER WITH INSTANT PAYOUTS & WALLET CREDITS
 console.log('Starting Supreme Transfer Server with Instant Payouts & Wallet Credits...');
 
 const express = require('express');
@@ -34,7 +34,7 @@ const stripeAccountCache = {};
 // Middleware
 app.use(cors());
 
-// Stripe webhook — must use raw body BEFORE express.json()
+// Stripe webhook â€” must use raw body BEFORE express.json()
 app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
   const sig = req.headers['stripe-signature'];
@@ -263,20 +263,20 @@ async function migratePasswordColumn() {
 
     if (hasPassword && hasPasswordHash) {
       // Both columns exist - drop password_hash and keep password
-      console.log('⚠️  Found both password and password_hash columns - removing password_hash...');
+      console.log('âš ï¸  Found both password and password_hash columns - removing password_hash...');
       await pool.query(`ALTER TABLE users DROP COLUMN password_hash`);
-      console.log('✅ Removed duplicate password_hash column');
+      console.log('âœ… Removed duplicate password_hash column');
     } else if (hasPasswordHash && !hasPassword) {
       // Only password_hash exists - rename to password
-      console.log('⚠️  Found password_hash column - migrating to password...');
+      console.log('âš ï¸  Found password_hash column - migrating to password...');
       await pool.query(`ALTER TABLE users RENAME COLUMN password_hash TO password`);
-      console.log('✅ Password column migrated successfully!');
+      console.log('âœ… Password column migrated successfully!');
     } else if (hasPassword) {
       // Only password exists - already migrated
-      console.log('✅ Password column already migrated (using "password")');
+      console.log('âœ… Password column already migrated (using "password")');
     }
   } catch (error) {
-    console.error('❌ Error migrating password column:', error);
+    console.error('âŒ Error migrating password column:', error);
     throw error; // Re-throw to prevent server from starting
   }
 }
@@ -296,9 +296,9 @@ async function addUsernameColumn() {
         ALTER TABLE users
         ADD COLUMN username VARCHAR(50) UNIQUE
       `);
-      console.log('✅ Username column added successfully');
+      console.log('âœ… Username column added successfully');
     } else {
-      console.log('✅ Username column already exists');
+      console.log('âœ… Username column already exists');
     }
   } catch (error) {
     console.error('Error adding username column:', error);
@@ -402,7 +402,7 @@ async function createAdminWithdrawalsTable() {
 
 async function setupEmailVerification() {
   try {
-    // Add email_verified column — DEFAULT true so existing users keep access
+    // Add email_verified column â€” DEFAULT true so existing users keep access
     await pool.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT true
     `);
@@ -456,7 +456,7 @@ async function getOrCreateConnectedAccount(userId, email) {
       console.log(`Creating Connected Account for ${email}`);
       
       // Create a new Connected Account with prefilled business information
-      // payout_schedule: manual — no automatic payouts; user must explicitly cash out
+      // payout_schedule: manual â€” no automatic payouts; user must explicitly cash out
       const account = await stripe.accounts.create({
         type: 'express',
         country: 'US',
@@ -618,7 +618,7 @@ app.post('/api/auth/forget', async (req, res) => {
       await mailgunTransporter.sendMail({
         from: 'Zoompay App <invite@bluestoneapps.com>',
         to: user.email,
-        subject: `${user.name || user.email} Forget Password OTP! 🎉`,
+        subject: `${user.name || user.email} Forget Password OTP! ðŸŽ‰`,
         html: `
         <!DOCTYPE html>
         <html>
@@ -751,7 +751,7 @@ app.post('/api/auth/registerAppUser', async (req, res) => {
             await mailgunTransporter.sendMail({
               from: 'Cash Flow App <invite@bluestoneapps.com>',
               to: inviter.email,
-              subject: `${user.name || user.email} accepted your Supreme Transfer invitation! 🎉`,
+              subject: `${user.name || user.email} accepted your Supreme Transfer invitation! ðŸŽ‰`,
               html: `
 <!DOCTYPE html>
 <html>
@@ -767,7 +767,7 @@ app.post('/api/auth/registerAppUser', async (req, res) => {
 <body>
   <div class="container">
     <div class="header">
-      <h1 style="margin: 0;">🎉 Great News!</h1>
+      <h1 style="margin: 0;">ðŸŽ‰ Great News!</h1>
     </div>
     <div class="content">
       <p>Hi ${inviter.name || inviter.email},</p>
@@ -878,7 +878,7 @@ app.post('/api/auth/register', async (req, res) => {
             await mailgunTransporter.sendMail({
               from: 'Cash Flow App <invite@bluestoneapps.com>',
               to: inviter.email,
-              subject: `${user.name || user.email} accepted your Supreme Transfer invitation! 🎉`,
+              subject: `${user.name || user.email} accepted your Supreme Transfer invitation! ðŸŽ‰`,
               html: `
 <!DOCTYPE html>
 <html>
@@ -894,7 +894,7 @@ app.post('/api/auth/register', async (req, res) => {
 <body>
   <div class="container">
     <div class="header">
-      <h1 style="margin: 0;">🎉 Great News!</h1>
+      <h1 style="margin: 0;">ðŸŽ‰ Great News!</h1>
     </div>
     <div class="content">
       <p>Hi ${inviter.name || inviter.email},</p>
@@ -1139,7 +1139,7 @@ app.put('/api/auth/username', authMiddleware, async (req, res) => {
 
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   try {
-    // DB is the source of truth for wallet balance — money stays on platform account
+    // DB is the source of truth for wallet balance â€” money stays on platform account
     const walletResult = await pool.query(
       'SELECT balance, platform_credit FROM wallets WHERE user_id = $1',
       [req.userId]
@@ -1276,7 +1276,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
   }
 
   try {
-    // Get or create Stripe customer (funds stay on platform — no transfer_data)
+    // Get or create Stripe customer (funds stay on platform â€” no transfer_data)
     const userResult = await pool.query(
       'SELECT email, stripe_customer_id FROM users WHERE id = $1',
       [req.userId]
@@ -1290,7 +1290,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
       try {
         await stripe.customers.retrieve(customerId);
       } catch (e) {
-        console.log(`Stale customer ID ${customerId} — creating fresh customer for user ${req.userId}`);
+        console.log(`Stale customer ID ${customerId} â€” creating fresh customer for user ${req.userId}`);
         customerId = null;
         await pool.query('UPDATE users SET stripe_customer_id = NULL WHERE id = $1', [req.userId]);
       }
@@ -1309,7 +1309,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
       console.log(`Created new Stripe customer ${customerId} for user ${req.userId}`);
     }
 
-    // Charge card — money stays on platform account, no transfer_data.
+    // Charge card â€” money stays on platform account, no transfer_data.
     // Connected account is only used at cash-out time.
     const paymentIntent = await stripe.paymentIntents.create({
       amount: chargeAmount,
@@ -1327,7 +1327,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
 
     console.log(`Created payment intent ${paymentIntent.id} for $${(chargeAmount/100).toFixed(2)} (wallet: $${(amount/100).toFixed(2)}, stripe fee: $${(stripeFee/100).toFixed(2)})`);
 
-    // Record pending transaction — wallet credited after confirm
+    // Record pending transaction â€” wallet credited after confirm
     await pool.query(
       'INSERT INTO transactions (user_id, type, amount, status, description, metadata) VALUES ($1, $2, $3, $4, $5, $6)',
       [req.userId, 'deposit', amount, 'pending',
@@ -1359,7 +1359,7 @@ app.post('/api/payments/confirm', authMiddleware, async (req, res) => {
     if (stripe && payment_intent_id && payment_intent_id !== 'mock_secret') {
       const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
 
-      // SECURITY: verify payment actually succeeded — declined/cancelled intents must never get credit
+      // SECURITY: verify payment actually succeeded â€” declined/cancelled intents must never get credit
       if (paymentIntent.status !== 'succeeded') {
         console.warn(`Payment confirm rejected: intent ${payment_intent_id} has status '${paymentIntent.status}' (not succeeded)`);
         return res.status(400).json({ error: `Payment was not successful (status: ${paymentIntent.status}). No funds added.` });
@@ -1379,7 +1379,7 @@ app.post('/api/payments/confirm', authMiddleware, async (req, res) => {
         [payment_intent_id]
       );
       if (alreadyCredited.rows.length > 0) {
-        console.log(`Payment ${payment_intent_id} already credited — skipping duplicate credit`);
+        console.log(`Payment ${payment_intent_id} already credited â€” skipping duplicate credit`);
         const walletResult = await pool.query('SELECT balance, platform_credit FROM wallets WHERE user_id = $1', [req.userId]);
         const bal = parseInt(walletResult.rows[0]?.balance) || 0;
         const pc = parseInt(walletResult.rows[0]?.platform_credit) || 0;
@@ -1392,7 +1392,7 @@ app.post('/api/payments/confirm', authMiddleware, async (req, res) => {
         [payment_intent_id]
       );
 
-      // Credit wallet in DB using Stripe-verified amount — money stays on platform, DB is source of truth
+      // Credit wallet in DB using Stripe-verified amount â€” money stays on platform, DB is source of truth
       await pool.query(
         'INSERT INTO wallets (user_id, balance) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET balance = wallets.balance + $2',
         [req.userId, verifiedAmount]
@@ -1647,7 +1647,7 @@ app.post('/api/stripe/instant-payout', authMiddleware, async (req, res) => {
         );
       } catch (instantError) {
         if (!forceStandard && instantError.message?.includes('instant')) {
-          // Instant not supported — roll back and tell user
+          // Instant not supported â€” roll back and tell user
           await stripe.transfers.createReversal(transfer.id);
           await pool.query('UPDATE wallets SET balance = balance + $1 WHERE user_id = $2', [requestedAmount, req.userId]);
           return res.status(400).json({
@@ -1662,7 +1662,7 @@ app.post('/api/stripe/instant-payout', authMiddleware, async (req, res) => {
         throw instantError;
       }
 
-      console.log(`Payout success — transfer: ${transfer.id}, payout: ${payout.id}`);
+      console.log(`Payout success â€” transfer: ${transfer.id}, payout: ${payout.id}`);
 
       // Record transaction
       await pool.query(
@@ -1765,7 +1765,7 @@ app.post('/api/stripe/cash-out', authMiddleware, async (req, res) => {
         { stripeAccount: accountId }
       );
 
-      console.log(`Cash out success — transfer: ${transfer.id}, payout: ${payout.id}`);
+      console.log(`Cash out success â€” transfer: ${transfer.id}, payout: ${payout.id}`);
 
       // Record transaction
       await pool.query(
@@ -2895,10 +2895,10 @@ Hi there!
 ${senderName} has invited you to join Supreme Transfer - a simple and secure digital wallet for sending and receiving money.
 ${personalMessage}
 With Supreme Transfer, you can:
-• Send and receive money instantly
-• Add funds from your card
-• Cash out to your bank account
-• Track all your transactions
+â€¢ Send and receive money instantly
+â€¢ Add funds from your card
+â€¢ Cash out to your bank account
+â€¢ Track all your transactions
 
 Join now: ${signupUrl}
 
@@ -2919,7 +2919,7 @@ See you there!
     .message { background: #f8f9ff; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; font-style: italic; }
     .features { background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; }
     .feature { margin: 10px 0; padding-left: 25px; position: relative; }
-    .feature:before { content: "✓"; position: absolute; left: 0; color: #28a745; font-weight: bold; }
+    .feature:before { content: "âœ“"; position: absolute; left: 0; color: #28a745; font-weight: bold; }
     .cta { text-align: center; margin: 30px 0; }
     .button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 10px; display: inline-block; font-weight: 600; }
     .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
@@ -2928,7 +2928,7 @@ See you there!
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo">💰</div>
+      <div class="logo">ðŸ’°</div>
       <h1 style="margin: 0;">You're Invited to Supreme Transfer!</h1>
     </div>
     <div class="content">
@@ -2949,7 +2949,7 @@ See you there!
     </div>
     <div class="footer">
       <p>This invitation was sent by ${senderName} (${sender?.email})</p>
-      <p>© ${new Date().getFullYear()} Supreme Transfer. All rights reserved.</p>
+      <p>Â© ${new Date().getFullYear()} Supreme Transfer. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -2960,7 +2960,7 @@ See you there!
     await mailgunTransporter.sendMail({
       from: 'Cash Flow App <invite@bluestoneapps.com>',
       to: email,
-      subject: `${senderName} invited you to join Supreme Transfer! 💰`,
+      subject: `${senderName} invited you to join Supreme Transfer! ðŸ’°`,
       text: emailText,
       html: emailHtml
     });
@@ -3261,7 +3261,7 @@ app.post('/api/stripe/create-account-link', authMiddleware, async (req, res) => 
       try {
         await stripe.accounts.retrieve(accountId);
       } catch (e) {
-        console.log(`Stale connected account ${accountId} — recreating for user ${req.userId}`);
+        console.log(`Stale connected account ${accountId} â€” recreating for user ${req.userId}`);
         accountId = null;
         await pool.query('UPDATE users SET stripe_account_id = NULL WHERE id = $1', [req.userId]);
       }
@@ -3579,7 +3579,7 @@ app.get('/admin/api/advances/pending', verifyAdmin, async (req, res) => {
 });
 
 /**
- * Platform Fees Report — sums all fee transactions from wallet_transactions
+ * Platform Fees Report â€” sums all fee transactions from wallet_transactions
  */
 app.get('/admin/api/platform-fees', verifyAdmin, async (req, res) => {
   try {
@@ -3979,7 +3979,7 @@ app.put('/admin/api/users/:userId/stripe-account', verifyAdmin, async (req, res)
  * Enable Instant Payouts for User's Stripe Account (Admin)
  */
 
-// Credit a user's DB wallet (admin — used for migration and manual adjustments)
+// Credit a user's DB wallet (admin â€” used for migration and manual adjustments)
 app.post('/admin/api/users/:userId/credit-wallet', verifyAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -4306,7 +4306,7 @@ app.get('/admin/api/transactions/:txnId/stripe-details', verifyAdmin, async (req
 });
 
 /**
- * Public Fee Config (no auth required — used by frontend Cash Out modal)
+ * Public Fee Config (no auth required â€” used by frontend Cash Out modal)
  */
 app.get('/api/config/fees', async (req, res) => {
   try {
@@ -4621,7 +4621,7 @@ app.get('/admin/api/users/:userId/payouts', verifyAdmin, async (req, res) => {
  * This mimics Stripe Dashboard's "Add Funds" feature
  */
 /**
- * Admin: Force-delete a user — zeros wallet first, then deletes everything
+ * Admin: Force-delete a user â€” zeros wallet first, then deletes everything
  */
 app.delete('/admin/api/users/:userId/force', verifyAdmin, async (req, res) => {
   const { userId } = req.params;
@@ -4674,7 +4674,7 @@ app.delete('/admin/api/users/:userId', verifyAdmin, async (req, res) => {
 
     const user = userRes.rows[0];
 
-    // Check wallet balance — refuse if non-zero balance (funds still owed to user)
+    // Check wallet balance â€” refuse if non-zero balance (funds still owed to user)
     const walletRes = await pool.query('SELECT balance, platform_credit FROM wallets WHERE user_id = $1', [userId]);
     const balance = parseInt(walletRes.rows[0]?.balance) || 0;
     const platformCredit = parseInt(walletRes.rows[0]?.platform_credit) || 0;
@@ -4754,10 +4754,10 @@ app.post('/admin/api/users/:userId/set-balance', verifyAdmin, async (req, res) =
       `INSERT INTO wallet_transactions (user_id, amount, transaction_type, description)
        VALUES ($1, $2, 'adjustment', $3)
        ON CONFLICT DO NOTHING`,
-      [userId, diff, reason || `Admin balance correction: ${(oldBalance/100).toFixed(2)} → ${balance_dollars}`]
+      [userId, diff, reason || `Admin balance correction: ${(oldBalance/100).toFixed(2)} â†’ ${balance_dollars}`]
     ).catch(() => {}); // non-fatal if wallet_transactions doesn't have this column
 
-    console.log(`Admin balance correction: user ${userId} (${userRes.rows[0].email}): ${(oldBalance/100).toFixed(2)} → $${balance_dollars}`);
+    console.log(`Admin balance correction: user ${userId} (${userRes.rows[0].email}): ${(oldBalance/100).toFixed(2)} â†’ $${balance_dollars}`);
 
     res.json({
       success: true,
@@ -4851,7 +4851,7 @@ app.post('/admin/api/users/:userId/send-funds', verifyAdmin, async (req, res) =>
           error: 'The stored Stripe account ID appears to be your platform account, not a Connected Account.',
           details: 'Please update the user\'s Stripe account ID to their actual Express Connected Account ID.',
           currentAccountId: accountId,
-          suggestion: 'Check the user\'s account in Stripe Dashboard → Connect → Accounts, and update the account ID in the admin panel.'
+          suggestion: 'Check the user\'s account in Stripe Dashboard â†’ Connect â†’ Accounts, and update the account ID in the admin panel.'
         });
       }
 
@@ -5156,12 +5156,12 @@ async function startServer() {
       console.log(`Stripe: ${stripe ? 'CONNECTED' : 'NOT CONFIGURED'}`);
       console.log('============================================================');
       console.log('Features:');
-      console.log('✅ Stripe Connected Accounts');
-      console.log('✅ Instant Payouts to Bank (1.5% fee)');
-      console.log('✅ Instant Wallet Credits (2% fee)');
-      console.log('✅ Platform Advances');
-      console.log('✅ User-to-User Transfers');
-      console.log('✅ Admin Portal');
+      console.log('âœ… Stripe Connected Accounts');
+      console.log('âœ… Instant Payouts to Bank (1.5% fee)');
+      console.log('âœ… Instant Wallet Credits (2% fee)');
+      console.log('âœ… Platform Advances');
+      console.log('âœ… User-to-User Transfers');
+      console.log('âœ… Admin Portal');
       console.log('============================================================');
     });
   } catch (error) {
@@ -5169,5 +5169,10 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Catch-all: serve index.html for any unmatched route (SPA routing)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 startServer();
