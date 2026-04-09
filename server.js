@@ -1,4 +1,4 @@
-﻿// COMPLETE CASHFLOW SERVER WITH INSTANT PAYOUTS & WALLET CREDITS
+﻿// COMPLETE SUPREME TRANSFER SERVER WITH INSTANT PAYOUTS & WALLET CREDITS
 console.log('Starting Supreme Transfer Server with Instant Payouts & Wallet Credits...');
 
 const express = require('express');
@@ -616,7 +616,7 @@ app.post('/api/auth/forget', async (req, res) => {
       const user=result.rows[0];
       await pool.query('UPDATE users SET otp = $1 WHERE email = $2', [otp,user.email]);
       await mailgunTransporter.sendMail({
-        from: 'Zoompay App <invite@bluestoneapps.com>',
+        from: 'Supreme Transfer <invite@bluestoneapps.com>',
         to: user.email,
         subject: `${user.name || user.email} Forget Password OTP! ðŸŽ‰`,
         html: `
