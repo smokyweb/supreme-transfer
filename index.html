@@ -1310,11 +1310,11 @@
             </div>
             
             <!-- Stripe Signup Banner — shown above tabs until Stripe is complete -->
-            <div id="stripeSignupBanner" style="background:#fff8e1; border:2px solid #ffc107; border-radius:14px; padding:16px 20px; margin-bottom:12px;">
-                <button onclick="handleStripeSignup()" style="background:linear-gradient(135deg,#ffc107 0%,#ff9800 100%); color:#fff; border:none; padding:12px 24px; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; width:100%; margin-bottom:10px;">
+            <div id="stripeSignupBanner" style="background:#e8f5e9; border:2px solid #00CC44; border-radius:14px; padding:16px 20px; margin-bottom:12px;">
+                <button onclick="handleStripeSignup()" style="background:linear-gradient(135deg,#00CC44 0%,#009933 100%); color:#fff; border:none; padding:12px 24px; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; width:100%; margin-bottom:10px;">
                     Complete Stripe Signup
                 </button>
-                <p style="color:#856404; font-size:14px; margin:0; text-align:center;">Please complete Stripe Signup to Send and Receive Funds in the new window. Then return to this screen.</p>
+                <p style="color:#1a5c2e; font-size:14px; margin:0; text-align:center;">Please complete Stripe Signup to Send and Receive Funds in the new window. Then return to this screen.</p>
             </div>
 
             <!-- Tabs -->
@@ -1338,8 +1338,8 @@
             <!-- Profile Tab -->
             <div id="profileTab" class="card hidden">
                 <!-- Stripe notice inline in profile (same banner, no JS needed — hidden by updateStripeSignupButton) -->
-                <div id="stripeProfileNotice" style="background:#fff8e1; border:1px solid #ffc107; border-radius:10px; padding:12px 16px; margin-bottom:16px; text-align:center;">
-                    <p style="color:#856404; font-size:14px; margin:0; font-weight:600;">Please complete Stripe Signup to Send and Receive Funds in the new window. Then return to this screen.</p>
+                <div id="stripeProfileNotice" style="background:#e8f5e9; border:1px solid #00CC44; border-radius:10px; padding:12px 16px; margin-bottom:16px; text-align:center;">
+                    <p style="color:#1a5c2e; font-size:14px; margin:0; font-weight:600;">Please complete Stripe Signup to Send and Receive Funds in the new window. Then return to this screen.</p>
                 </div>
                 <h3>Profile</h3>
                 <div class="form-group">
@@ -4106,7 +4106,7 @@
                 if (banner) banner.style.display = 'none';
                 if (profileNotice) profileNotice.style.display = 'none';
             } else {
-                if (btn) { btn.style.background = 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)'; btn.disabled = false; btn.style.opacity = '1'; }
+                if (btn) { btn.style.background = 'linear-gradient(135deg, #00CC44 0%, #009933 100%)'; btn.disabled = false; btn.style.opacity = '1'; }
                 if (text) text.textContent = 'Complete Stripe Signup';
                 if (banner) banner.style.display = 'block';
                 if (profileNotice) profileNotice.style.display = 'block';

@@ -1,0 +1,54 @@
+﻿Rework the CSS/styling in index.html to match this design spec exactly. The file is at C:\Users\kevin\projects\supreme-transfer\index.html (3800+ lines). DO NOT change any JavaScript logic, API calls, or functionality — only visual/CSS changes.
+
+DESIGN SPEC:
+=============
+Color Palette:
+- Dark Navy (primary bg, header): #1B2A4A
+- Bright Green (CTAs, accents): #2DB843
+- Page background: #F5F6FA
+- White: #FFFFFF (cards)
+- Input bg: #F0F1F5
+- Input border: #E0E2E8
+- Dark text: #1A1A2E
+- Medium gray text: #6B7280
+
+LOGIN PAGE:
+- Top ~55% of screen: dark navy gradient (linear-gradient(135deg, #1B2A4A 0%, #243356 50%, #1E2D4F 100%)) with subtle diagonal stripe texture
+- Logo (logo.png) centered in the navy section
+- Diagonal green cut separating navy from white form section (use clip-path or skewed pseudo-element)
+- Bottom ~45%: white background
+- "SIGN IN" heading: bold, uppercase, dark text, with a short green underline bar (#2DB843, 4px tall, 60px wide)
+- Input fields: #F0F1F5 bg, #E0E2E8 border, 12px border-radius, 56px height, icons on left
+- Email icon: envelope (gray), Password icon: lock (gray), Password show/hide: eye (green)
+- "Remember Me" checkbox: green when checked, "Forgot Password?" on right
+- Sign In button: #2DB843 green, white text, uppercase, bold, 58px height, 14px radius, green shadow
+- "Create an Account" link: centered below button
+
+DASHBOARD / HOME:
+- Top nav bar: #1B2A4A navy, white text, green bottom border (3px #2DB843)
+- Page body: #F5F6FA light gray background
+- Balance card: white, 16px radius, centered, shadow
+- "My Balance" label: gray (#6B7280), 14px
+- Balance amount: very large (38-42px), extra bold, dark (#1A1A2E)
+- Two action buttons (SEND / REQUEST): 
+  - SEND: #1B2A4A navy bg, white text/icon, 16px radius
+  - REQUEST: #2DB843 green bg, white text/icon, 16px radius
+  - Both side by side, full-width combined, icons are circle-outline arrows
+- Section headers: uppercase, extra bold, dark; "View All" link in green
+- Transaction items: white cards, 14px radius, subtle shadow
+- Transaction avatar: 44px circle
+- Direction indicators: navy circle = outgoing, green circle = incoming
+
+BOTTOM NAV:
+- Background: #FFFFFF with top border
+- Active icon: #2DB843 green
+- Inactive icons: #9CA3AF gray
+
+GENERAL:
+- Replace ALL instances of the old dark theme (#0A0A1A, #12122a, #1a1a3e, #C9A84C gold) with the new navy/green palette
+- The logo file is logo.png (already in the project root)
+- Keep the existing page structure (login form, dashboard sections, transfer modals, etc.)
+- Google Font: Add Poppins (weights 400, 600, 700, 800, 900) to the <head>
+- Use Poppins as the primary font throughout
+
+After making all changes, save the file.
