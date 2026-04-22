@@ -424,17 +424,68 @@ async function setupEmailVerification() {
 }
 
 // Call on server start - wrap in async initialization
-async function migrateTransactionsTable() {
+async function createTransactionsTable() {
   try {
-    // schema.sql created transactions with from_user_id/to_user_id but server code
-    // uses user_id, description, and metadata — add them if they don't exist
-    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)`);
-    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT`);
-    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata JSONB`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`);
-    console.log('Transactions table migration complete');
+    // Fresh install: create table with BIGSERIAL id (auto-generated) and all columns
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id BIGSERIAL PRIMARY KEY,
+        user_id VARCHAR(50),
+        type VARCHAR(50),
+        amount INTEGER DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'completed',
+        description TEXT,
+        metadata JSONB,
+        from_user_id VARCHAR(50),
+        to_user_id VARCHAR(50),
+        payment_intent_id VARCHAR(255),
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Existing table (created from schema.sql with old schema): add missing columns idempotently
+    const missingCols = [
+      ['user_id', 'VARCHAR(50)'],
+      ['description', 'TEXT'],
+      ['metadata', 'JSONB'],
+      ['status', "VARCHAR(50) DEFAULT 'completed'"],
+      ['type', 'VARCHAR(50)'],
+      ['amount', 'INTEGER DEFAULT 0'],
+      ['from_user_id', 'VARCHAR(50)'],
+      ['to_user_id', 'VARCHAR(50)'],
+      ['payment_intent_id', 'VARCHAR(255)'],
+      ['note', 'TEXT']
+    ];
+    for (const [colName, colDef] of missingCols) {
+      await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ${colName} ${colDef}`).catch(() => {});
+    }
+
+    // Fix id column: schema.sql created id as VARCHAR(50) PRIMARY KEY with no DEFAULT
+    // Add a sequence-backed default so INSERTs without an explicit id succeed
+    await pool.query(`
+      DO $$
+      DECLARE
+        col_default text;
+        col_type text;
+      BEGIN
+        SELECT column_default, data_type
+        INTO col_default, col_type
+        FROM information_schema.columns
+        WHERE table_name = 'transactions' AND column_name = 'id';
+
+        IF col_default IS NULL AND col_type = 'character varying' THEN
+          CREATE SEQUENCE IF NOT EXISTS transactions_id_seq;
+          ALTER TABLE transactions ALTER COLUMN id SET DEFAULT ('txn_' || nextval('transactions_id_seq')::text);
+        END IF;
+      END $$
+    `).catch((e) => console.warn('transactions id fix warning:', e.message));
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`).catch(() => {});
+    console.log('Transactions table ready');
   } catch (error) {
-    console.error('Transactions migration error:', error);
+    console.error('Transactions table error:', error);
   }
 }
 
@@ -450,7 +501,7 @@ async function initializeDatabase() {
   await createPaymentRequestsTable();
   await createAdminWithdrawalsTable();
   await setupEmailVerification();
-  await migrateTransactionsTable();
+  await createTransactionsTable();
   console.log('Database initialization complete!');
 }
 
