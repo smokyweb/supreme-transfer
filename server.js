@@ -424,6 +424,20 @@ async function setupEmailVerification() {
 }
 
 // Call on server start - wrap in async initialization
+async function migrateTransactionsTable() {
+  try {
+    // schema.sql created transactions with from_user_id/to_user_id but server code
+    // uses user_id, description, and metadata — add them if they don't exist
+    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id VARCHAR(50)`);
+    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT`);
+    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata JSONB`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`);
+    console.log('Transactions table migration complete');
+  } catch (error) {
+    console.error('Transactions migration error:', error);
+  }
+}
+
 async function initializeDatabase() {
   console.log('Initializing database...');
   await createSystemSettingsTable();
@@ -436,6 +450,7 @@ async function initializeDatabase() {
   await createPaymentRequestsTable();
   await createAdminWithdrawalsTable();
   await setupEmailVerification();
+  await migrateTransactionsTable();
   console.log('Database initialization complete!');
 }
 

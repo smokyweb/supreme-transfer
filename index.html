@@ -774,8 +774,15 @@
             box-shadow: var(--shadow-soft);
         }
 
+        #appHeader .app-brand {
+            background: #ffffff;
+            padding: 8px 14px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+        }
         #appHeader .app-brand img {
-            width: 118px;
+            width: 160px;
             height: auto;
         }
 
@@ -1915,11 +1922,9 @@
         let user_id = localStorage.getItem('user_id')
         // Check if user is logged in
         if (token) {
-            // if(user_id==='user_1767184782619'){
-            //     console.log('I am here')
-            // } else {
-                checkAuth();
-            // }
+            // Hide login screen immediately while auth check runs (prevents flash)
+            document.getElementById('loginScreen').classList.add('hidden');
+            checkAuth();
         }
         
         // Show/hide functions
