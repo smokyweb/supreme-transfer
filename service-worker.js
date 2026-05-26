@@ -1,4 +1,4 @@
-const CACHE_NAME = 'supreme-v1';
+const CACHE_NAME = 'supreme-v4';
 const urlsToCache = [
   '/',
   '/index.html',
