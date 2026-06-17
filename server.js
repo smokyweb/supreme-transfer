@@ -1215,23 +1215,25 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
     const hasAccount = !!userResult.rows[0]?.stripe_account_id;
     const stripeAccountId = userResult.rows[0]?.stripe_account_id;
 
-    // Pending = DB transactions with pending status (platform-level pending, not Stripe)
-    // Stripe pending is a separate concept (funds clearing in Stripe Connect account)
-    // Here we show platform-level pending deposits the user is waiting on
-    const pendingResult = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending'",
-      [req.userId]
-    );
-    const pending = parseInt(pendingResult.rows[0]?.pending) || 0;
-
-    // Also get Stripe pending separately for cash-out eligibility checks
-    let stripePending = 0;
+    // Pending = always use Stripe as source of truth (avoids stale DB transactions)
+    let pending = 0;
     if (stripeAccountId) {
       try {
         const stripeBalance = await stripe.balance.retrieve({ stripeAccount: stripeAccountId });
-        stripePending = stripeBalance.pending.reduce((sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0);
-      } catch (e) { /* ignore */ }
+        pending = stripeBalance.pending.reduce((sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0);
+        // Auto-clear any stale DB pending transactions since Stripe is the truth
+        if (pending === 0) {
+          await pool.query(
+            "UPDATE transactions SET status = 'completed' WHERE user_id = $1 AND type = 'deposit' AND status = 'pending'",
+            [req.userId]
+          );
+        }
+      } catch (e) {
+        // Stripe call failed — show 0 pending rather than stale DB data
+        pending = 0;
+      }
     }
+    const stripePending = pending; // same value, kept for response clarity
 
     res.json({
       balance: totalAvailable,
