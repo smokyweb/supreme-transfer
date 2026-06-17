@@ -1626,25 +1626,25 @@
                 <div style="margin-bottom: 20px;">
                     <label style="font-weight: 600; margin-bottom: 10px; display: block;">Select Payout Type:</label>
 
-                    <label id="cashOutStandardLabel" onclick="setCashOutType('standard')" style="display: block; padding: 14px; border: 2px solid #28a745; border-radius: 10px; cursor: pointer; margin-bottom: 10px; background: #f0fff4; transition: all 0.2s; box-sizing: border-box; width: 100%;">
-                        <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="radio" name="cashOutType" id="cashOutTypeStandard" value="standard" checked style="accent-color: #28a745; flex-shrink: 0; margin-top: 3px;">
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <strong style="color: #155724; font-size: 15px;">Standard (FREE)</strong>
-                                <div id="cashOutStandardLabelText" style="font-size: 13px; color: #666; line-height: 1.4;">
-                                    Standard ACH &middot; No fees &middot; Goes to linked bank
+                    <label id="cashOutStandardLabel" onclick="setCashOutType('standard')" style="display: block; padding: 14px 16px; border: 2px solid #28a745; border-radius: 10px; cursor: pointer; margin-bottom: 10px; background: #f0fff4; transition: all 0.2s; box-sizing: border-box; width: 100%; overflow: hidden;">
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <input type="radio" name="cashOutType" id="cashOutTypeStandard" value="standard" checked style="accent-color: #28a745; flex-shrink: 0; margin-top: 4px; width: 18px; height: 18px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <strong style="color: #155724; font-size: 15px; display: block; margin-bottom: 4px;">Standard (FREE)</strong>
+                                <div id="cashOutStandardLabelText" style="font-size: 13px; color: #555; line-height: 1.5; white-space: normal; word-wrap: break-word;">
+                                    Standard ACH &middot; No admin fees &middot; Goes to linked bank
                                 </div>
                             </div>
                         </div>
                     </label>
 
-                    <label id="cashOutInstantLabel" onclick="setCashOutType('instant')" style="display: block; padding: 14px; border: 2px solid #dee2e6; border-radius: 10px; cursor: pointer; background: #fff; transition: all 0.2s; box-sizing: border-box; width: 100%;">
-                        <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="radio" name="cashOutType" id="cashOutTypeInstant" value="instant" style="accent-color: #fd7e14; flex-shrink: 0; margin-top: 3px;">
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <strong style="color: #c45a00; font-size: 15px;">Instant (1.5% fee)</strong>
-                                <div id="cashOutInstantLabelText" style="font-size: 13px; color: #666; line-height: 1.4;">
-                                    1.5% fee (min $0.50) &middot; Goes to linked bank
+                    <label id="cashOutInstantLabel" onclick="setCashOutType('instant')" style="display: block; padding: 14px 16px; border: 2px solid #dee2e6; border-radius: 10px; cursor: pointer; background: #fff; transition: all 0.2s; box-sizing: border-box; width: 100%; overflow: hidden;">
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <input type="radio" name="cashOutType" id="cashOutTypeInstant" value="instant" style="accent-color: #fd7e14; flex-shrink: 0; margin-top: 4px; width: 18px; height: 18px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <strong style="color: #c45a00; font-size: 15px; display: block; margin-bottom: 4px;">Instant (1.5% fee)</strong>
+                                <div id="cashOutInstantLabelText" style="font-size: 13px; color: #555; line-height: 1.5; white-space: normal; word-wrap: break-word;">
+                                    1.5% Stripe fee &middot; ~30 min &middot; Goes to linked bank
                                 </div>
                             </div>
                         </div>
@@ -1797,9 +1797,9 @@
                     </div>
                     <div class="form-group">
                         <label>Amount</label>
-                        <div style="position: relative;">
-                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #666; font-size: 18px;">$</span>
-                            <input type="number" id="requestAmount" step="0.01" min="0.01" placeholder="0.00" required style="padding-left: 30px;">
+                        <div style="display: flex; align-items: center; border: 2px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: #fff;">
+                            <span style="padding: 12px 8px 12px 14px; color: #666; font-size: 18px; font-weight: 600; line-height: 1;">$</span>
+                            <input type="number" id="requestAmount" step="0.01" min="0.01" placeholder="0.00" required style="border: none; outline: none; padding: 12px 12px 12px 0; font-size: 18px; width: 100%; background: transparent;">
                         </div>
                     </div>
                     <div class="form-group">

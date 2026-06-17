@@ -1210,16 +1210,32 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
     const platformCredit = parseInt(walletResult.rows[0]?.platform_credit) || 0;
     const totalAvailable = walletBalance + platformCredit;
 
-    // Pending = deposits not yet confirmed (exclude stale entries older than 2 hours)
-    const pendingResult = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending' AND created_at > NOW() - INTERVAL '2 hours'",
-      [req.userId]
-    );
-    const pending = parseInt(pendingResult.rows[0]?.pending) || 0;
-
     // Check if connected account exists (for cash-out eligibility)
     const userResult = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [req.userId]);
     const hasAccount = !!userResult.rows[0]?.stripe_account_id;
+    const stripeAccountId = userResult.rows[0]?.stripe_account_id;
+
+    // Pending = use Stripe as source of truth if connected account exists
+    let pending = 0;
+    if (stripeAccountId) {
+      try {
+        const stripeBalance = await stripe.balance.retrieve({ stripeAccount: stripeAccountId });
+        pending = stripeBalance.pending.reduce((sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0);
+      } catch (e) {
+        // Fallback to DB pending if Stripe call fails
+        const pendingResult = await pool.query(
+          "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes'",
+          [req.userId]
+        );
+        pending = parseInt(pendingResult.rows[0]?.pending) || 0;
+      }
+    } else {
+      const pendingResult = await pool.query(
+        "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes'",
+        [req.userId]
+      );
+      pending = parseInt(pendingResult.rows[0]?.pending) || 0;
+    }
 
     res.json({
       balance: totalAvailable,
