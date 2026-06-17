@@ -1215,26 +1215,22 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
     const hasAccount = !!userResult.rows[0]?.stripe_account_id;
     const stripeAccountId = userResult.rows[0]?.stripe_account_id;
 
-    // Pending = use Stripe as source of truth if connected account exists
-    let pending = 0;
+    // Pending = DB transactions with pending status (platform-level pending, not Stripe)
+    // Stripe pending is a separate concept (funds clearing in Stripe Connect account)
+    // Here we show platform-level pending deposits the user is waiting on
+    const pendingResult = await pool.query(
+      "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending'",
+      [req.userId]
+    );
+    const pending = parseInt(pendingResult.rows[0]?.pending) || 0;
+
+    // Also get Stripe pending separately for cash-out eligibility checks
+    let stripePending = 0;
     if (stripeAccountId) {
       try {
         const stripeBalance = await stripe.balance.retrieve({ stripeAccount: stripeAccountId });
-        pending = stripeBalance.pending.reduce((sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0);
-      } catch (e) {
-        // Fallback to DB pending if Stripe call fails
-        const pendingResult = await pool.query(
-          "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes'",
-          [req.userId]
-        );
-        pending = parseInt(pendingResult.rows[0]?.pending) || 0;
-      }
-    } else {
-      const pendingResult = await pool.query(
-        "SELECT COALESCE(SUM(amount), 0) AS pending FROM transactions WHERE user_id = $1 AND type = 'deposit' AND status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes'",
-        [req.userId]
-      );
-      pending = parseInt(pendingResult.rows[0]?.pending) || 0;
+        stripePending = stripeBalance.pending.reduce((sum, bal) => bal.currency === 'usd' ? sum + bal.amount : sum, 0);
+      } catch (e) { /* ignore */ }
     }
 
     res.json({
@@ -1242,6 +1238,8 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
       formatted: `$${(totalAvailable / 100).toFixed(2)}`,
       pending: pending,
       pendingFormatted: `$${(pending / 100).toFixed(2)}`,
+      stripePending: stripePending,
+      stripePendingFormatted: `$${(stripePending / 100).toFixed(2)}`,
       platformCredit: platformCredit,
       platformCreditFormatted: `$${(platformCredit / 100).toFixed(2)}`,
       hasAccount: hasAccount

@@ -1619,12 +1619,18 @@
                 <!-- Close X Button -->
                 <button onclick="closeCashOutModal()" class="close-btn">&times;</button>
 
-                <h2>Cash Out to Bank</h2>
-                <p style="color: #666; margin-bottom: 20px;">Send funds to your bank via ACH</p>
+                <h2 id="cashOutModalTitle">Cash Out</h2>
+                <p id="cashOutModalSubtitle" style="color: #666; margin-bottom: 16px;">Choose where to send your funds</p>
 
-                <!-- Payout Type Selection -->
-                <div style="margin-bottom: 20px;">
-                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Select Payout Type:</label>
+                <!-- Destination Selection -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                    <button id="cashOutDestBank" onclick="setCashOutDest('bank')" style="padding: 12px 8px; border: 2px solid #28a745; border-radius: 10px; background: #f0fff4; color: #155724; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s;">🏦 Bank<br><small style="font-weight:400;">ACH Transfer</small></button>
+                    <button id="cashOutDestWallet" onclick="setCashOutDest('wallet')" style="padding: 12px 8px; border: 2px solid #dee2e6; border-radius: 10px; background: #fff; color: #333; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s;">👛 Wallet<br><small style="font-weight:400;">Instant Credit</small></button>
+                </div>
+
+                <!-- Payout Type Selection (bank only) -->
+                <div id="cashOutBankTypeSection" style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; margin-bottom: 10px; display: block;">Select Payout Speed:</label>
 
                     <label id="cashOutStandardLabel" onclick="setCashOutType('standard')" style="display: block; padding: 14px 16px; border: 2px solid #28a745; border-radius: 10px; cursor: pointer; margin-bottom: 10px; background: #f0fff4; transition: all 0.2s; box-sizing: border-box; width: 100%; overflow: hidden;">
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
@@ -1649,6 +1655,12 @@
                             </div>
                         </div>
                     </label>
+                </div><!-- end cashOutBankTypeSection -->
+
+                <!-- Wallet Cash Out Info -->
+                <div id="cashOutWalletSection" style="display: none; margin-bottom: 20px; background: #d4edda; border: 2px solid #28a745; border-radius: 10px; padding: 16px;">
+                    <strong style="color: #155724; font-size: 15px;">&#128092; Cash Out to Wallet</strong>
+                    <p style="color: #155724; margin: 8px 0 0; font-size: 14px; line-height: 1.5;">Moves your available balance into your Supreme Transfer wallet as platform credit. Instantly available to send to others.<br><strong>2% platform fee applies.</strong></p>
                 </div>
 
                 <!-- Amount Selection -->
@@ -2495,14 +2507,53 @@
             } catch (e) { /* use defaults */ }
         }
 
+        let cashOutDestination = 'bank'; // 'bank' or 'wallet'
+
+        function setCashOutDest(dest) {
+            cashOutDestination = dest;
+            const bankBtn = document.getElementById('cashOutDestBank');
+            const walletBtn = document.getElementById('cashOutDestWallet');
+            const bankSection = document.getElementById('cashOutBankTypeSection');
+            const walletSection = document.getElementById('cashOutWalletSection');
+            const title = document.getElementById('cashOutModalTitle');
+            const subtitle = document.getElementById('cashOutModalSubtitle');
+            if (dest === 'bank') {
+                bankBtn.style.border = '2px solid #28a745';
+                bankBtn.style.background = '#f0fff4';
+                bankBtn.style.color = '#155724';
+                walletBtn.style.border = '2px solid #dee2e6';
+                walletBtn.style.background = '#fff';
+                walletBtn.style.color = '#333';
+                bankSection.style.display = 'block';
+                walletSection.style.display = 'none';
+                title.textContent = 'Cash Out to Bank';
+                subtitle.textContent = 'Send funds to your bank via ACH';
+            } else {
+                walletBtn.style.border = '2px solid #28a745';
+                walletBtn.style.background = '#f0fff4';
+                walletBtn.style.color = '#155724';
+                bankBtn.style.border = '2px solid #dee2e6';
+                bankBtn.style.background = '#fff';
+                bankBtn.style.color = '#333';
+                bankSection.style.display = 'none';
+                walletSection.style.display = 'block';
+                title.textContent = 'Cash Out to Wallet';
+                subtitle.textContent = 'Move funds to your Supreme Transfer wallet instantly';
+            }
+            updateCashOutDisplay();
+        }
+
         function showCashOutModal() {
             document.getElementById('cashOutModal').style.display = 'flex';
             // Reset state
             cashOutConfirmPending = false;
+            cashOutDestination = 'bank';
             document.getElementById('cashOutConfirmBox').style.display = 'none';
             document.getElementById('cashOutButtonText').textContent = 'Review Cash Out';
             document.getElementById('confirmCashOut').style.background = 'linear-gradient(135deg, #28a745 0%, #218838 100%)';
-            // Default to standard
+            // Default to bank destination
+            setCashOutDest('bank');
+            // Default to standard payout type
             setCashOutType('standard');
             // Load live fees then check availability
             loadCashOutFees().then(() => {
