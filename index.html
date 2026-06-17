@@ -639,7 +639,7 @@
             border: 1px solid var(--input-border) !important;
         }
 
-        #loginScreen {
+        #loginScreen:not(.hidden) {
             padding: 0 !important;
             overflow: hidden;
             min-height: calc(100vh - 40px);
@@ -1924,7 +1924,9 @@
         // Check if user is logged in
         if (token) {
             // Hide login screen immediately while auth check runs (prevents flash)
-            document.getElementById('loginScreen').classList.add('hidden');
+            const loginEl = document.getElementById('loginScreen');
+            loginEl.classList.add('hidden');
+            loginEl.style.display = 'none'; // override display:grid !important in CSS
             checkAuth();
         }
         
